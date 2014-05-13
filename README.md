@@ -1,0 +1,1 @@
+Initial readme for RustFS.
