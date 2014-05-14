@@ -106,7 +106,7 @@ impl<T> SlabAllocator<T> {
     let mut allocator = SlabAllocator {
       items: Vec::with_capacity(initial_size),
       alloc: 0,
-      capacity: initial_size
+      capacity: 0
     };
 
     allocator.expand(initial_size);
@@ -124,6 +124,8 @@ impl<T> SlabAllocator<T> {
         self.items.push(memory.offset(i));
       }
     }
+
+    self.capacity += new_items;
   }
 
   fn alloc(&mut self, value: T) -> SlabBox<T> {
@@ -202,6 +204,37 @@ mod tests {
     let mut slab_allocator = box SlabAllocator::new(20);
     let object = slab_allocator.alloc(239);
     assert_eq!(*object, 239);
+  }
+
+  #[test]
+  fn test_many_alloc() {
+    let mut slab_allocator = box SlabAllocator::new(20);
+
+    // Alloacting and verifying 20 items and putting into vector.
+    let mut vec = Vec::new();
+    for i in range(0, 20) {
+      let obj = slab_allocator.alloc(i);
+      assert_eq!(*obj, i);
+      vec.push(obj);
+    }
+
+    // Making sure they're all still there and different.
+    let mut i = 0;
+    for obj in vec.iter() {
+      assert_eq!(**obj, i);
+      i += 1;
+    }
+  }
+
+  #[test]
+  #[should_fail]
+  fn test_over_alloc() {
+    // This test should pass after objects are able to be returned to allocator
+    let mut slab_allocator = box SlabAllocator::new(20);
+    for i in range(0, 21) {
+      let object = slab_allocator.alloc(i);
+      assert_eq!(*object, i);
+    }
   }
 }
 
