@@ -1,5 +1,3 @@
-#![feature(globs)]
-
 extern crate time;
 extern crate collections;
 

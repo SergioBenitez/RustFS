@@ -3,7 +3,7 @@
 extern crate time;
 extern crate collections;
 
-use file::{File, Directory, Empty};
+use file::{File, Directory};
 
 mod file;
 mod inode;
@@ -31,11 +31,13 @@ impl DirectoryHandle for File {
   fn get(&self, name: ~str) -> File {
     let rc = self.get_dir_rc();
     let content = rc.borrow();
-    content.entries.get(&name).clone()
+    content.entries.get(&name).clone() // It's RCd
   }
 }
 
 fn main() {
+  use file::Empty;
+
   let mut dir = File::new_dir(); 
   println!("{}", dir.is_dir());
 
