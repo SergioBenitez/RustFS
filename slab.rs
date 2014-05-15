@@ -38,75 +38,82 @@ use std::mem;
 use std::mem::transmute;
 use std::rc::Rc;
 use libc::{size_t, malloc};
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 
 #[deriving(Show)]
-struct Slab<T> {
-  item: *mut T
+struct Slab<'a, T> {
+  parent: &'a SlabAllocator<T>,
+  ptr: *mut T
 }
 
-impl<T> Deref<T> for Slab<T> {
-  fn deref<'a>(&'a self) -> &'a T {
-    unsafe { & *self.item }
+impl<'a, T: Send> Slab<'a, T> {
+  pub fn borrow<'r>(&'r self) -> &'r T {
+    unsafe { &*self.ptr }
+  }
+
+  pub fn borrow_mut<'r>(&'r mut self) -> &'r mut T {
+    unsafe { &mut*self.ptr }
   }
 }
 
-impl<T> DerefMut<T> for Slab<T> {
-  fn deref_mut<'a>(&'a mut self) -> &'a mut T {
-    unsafe { &mut *self.item }
-  }
-}
-
-impl<T> Eq for Slab<T> {
+impl<'a, T: Eq + Send> Eq for Slab<'a, T> {
   fn eq(&self, other: &Slab<T>) -> bool {
-    self.item == other.item
+    self.borrow() == other.borrow()
   }
 }
 
 #[unsafe_destructor]
-impl<T> Drop for Slab<T> {
+impl<'a, T> Drop for Slab<'a, T> {
   fn drop(&mut self) {
-    println!("I should be returned back to allocator.");
+    println!("I should be returned back to {:?}.", self.parent);
   }
 }
 
 #[deriving(Clone)]
-struct SlabBox<T>(Rc<RefCell<Slab<T>>>);
+struct SlabBox<'a, T>(Rc<RefCell<Slab<'a, T>>>);
 
-impl<T> Deref<T> for SlabBox<T> {
-  fn deref<'a>(&'a self) -> &'a T {
-    unsafe {
-      let cell = match self {
-        &SlabBox(ref rc) => (rc.borrow())
-      };
-      transmute(cell.deref().deref())
-    }
+impl<'a, T: Send> SlabBox<'a, T> {
+  #[inline(always)]
+  fn borrow<'r>(&'r self) -> &'r T {
+    let SlabBox(ref rc) = *self;
+    unsafe { transmute(rc.borrow().borrow()) }
+  }
+
+  #[inline(always)]
+  fn borrow_mut<'r>(&'r self) -> &'r mut T {
+    let SlabBox(ref rc) = *self;
+    unsafe { transmute(rc.borrow_mut().borrow_mut()) }
   }
 }
 
-impl<T> DerefMut<T> for SlabBox<T> {
-  fn deref_mut<'a>(&'a mut self) -> &'a mut T {
-    unsafe {
-      let mut cell = match self {
-        &SlabBox(ref rc) => (rc.borrow_mut())
-      };
-      transmute(cell.deref_mut().deref_mut())
-    }
+impl<'a, T: Send> Deref<T> for SlabBox<'a, T> {
+  #[inline(always)]
+  fn deref<'r>(&'r self) -> &'r T {
+    self.borrow()
   }
 }
 
+impl<'a, T: Send> DerefMut<T> for SlabBox<'a, T> {
+  #[inline(always)]
+  fn deref_mut<'r>(&'r mut self) -> &'r mut T {
+    self.borrow_mut()
+  }
+}
+
+#[deriving(Show)]
 struct SlabAllocator<T> {
-  items: Vec<*mut T>, // holds pointers to allocations
-  alloc: uint,        // number of outstanding items
-  capacity: uint      // number of items pre-allocated (valid in items)
+  items: Vec<*mut T>,       // holds pointers to allocations
+  alloc: Cell<uint>,        // number of outstanding items
+  capacity: Cell<uint>      // number of items pre-allocated (valid in items)
+
 }
 
-impl<T> SlabAllocator<T> {
+impl<T: Send> SlabAllocator<T> {
   fn new(initial_size: uint) -> SlabAllocator<T> {
     let mut allocator = SlabAllocator {
       items: Vec::with_capacity(initial_size),
-      alloc: 0,
-      capacity: 0
+      alloc: Cell::new(0),
+      capacity: Cell::new(0)
     };
 
     allocator.expand(initial_size);
@@ -125,19 +132,18 @@ impl<T> SlabAllocator<T> {
       }
     }
 
-    self.capacity += new_items;
+    self.capacity.set(self.capacity.get() + new_items);
   }
 
-  fn alloc(&mut self, value: T) -> SlabBox<T> {
-    if self.alloc >= self.capacity { fail!("Out of memory."); }
+  fn alloc<'r>(&'r self, value: T) -> SlabBox<'r, T> {
+    let alloc = self.alloc.get();
+    if alloc >= self.capacity.get() { fail!("Out of memory."); }
 
-    let item: *mut T = *self.items.get(self.alloc);
-    unsafe {
-      mem::move_val_init(&mut *item, value);
-    }
+    let ptr: *mut T = *self.items.get(alloc);
+    unsafe { mem::move_val_init(&mut *ptr, value); }
 
-    self.alloc += 1;
-    let slab = Slab { item: item };
+    self.alloc.set(alloc + 1);
+    let slab = Slab { parent: self, ptr: ptr }; 
     SlabBox(Rc::new(RefCell::new(slab)))
   }
 }
@@ -148,21 +154,52 @@ mod tests {
   use super::SlabAllocator;
 
   #[test]
-  fn test_one_alloc() {
-    let mut slab_allocator = SlabAllocator::new(20);
+  fn test_one_mut_alloc() {
+    let slab_allocator = SlabAllocator::new(20);
     let object = slab_allocator.alloc(239);
     assert_eq!(*object, 239);
+    assert_eq!(*object, *slab_allocator.alloc(239));
   }
 
   #[test]
-  fn test_two_allocs() {
-    let mut slab_allocator = SlabAllocator::new(20);
-    let object = slab_allocator.alloc(239);
-    let object2 = slab_allocator.alloc(23089);
+  fn test_one_struct_alloc() {
+    #[deriving(Eq, Show, Clone)]
+    struct MyThing {
+      field1: Option<Box<int>>,
+      done: bool
+    }
+
+    impl Drop for MyThing {
+      fn drop(&mut self) {
+        if !self.done { fail!("Should not be dropped: {}", self.done); }
+      }
+    }
+    
+    let slab_allocator = SlabAllocator::new(20);
+    let struct_obj = MyThing { field1: Some(box 20), done: false };
+    let mut object = slab_allocator.alloc(struct_obj);
+
+    assert_eq!(object.field1, Some(box 20));
+    object.done = true;
+
+    // Now with a boxed type
+    let slab_allocator = SlabAllocator::new(20);
+    let struct_obj = box MyThing { field1: Some(box 40), done: false };
+    let mut object = slab_allocator.alloc(struct_obj);
+
+    assert_eq!(object.field1, Some(box 40)); // same as (*object).field1
+    object.done = true;
+  }
+
+  #[test]
+  fn test_two_allocs_with_boxes() {
+    let slab_allocator = SlabAllocator::new(20);
+    let object = slab_allocator.alloc(box 239);
+    let object2 = slab_allocator.alloc(box 23089);
     let object3 = object.clone();
 
-    assert!(*object == 239);
-    assert_eq!(*object2, 23089);
+    assert!(**object == 239);
+    assert_eq!(*object2, box 23089);
     assert!(*object2 != *object);
     assert!(*object2 != *object);
     assert_eq!(*object3, *object);
@@ -170,7 +207,7 @@ mod tests {
 
   #[test]
   fn test_mut_alloc() {
-    let mut slab_allocator = SlabAllocator::new(20);
+    let slab_allocator = SlabAllocator::new(20);
     let mut object = slab_allocator.alloc(239);
     assert_eq!(*object, 239);
 
@@ -178,13 +215,12 @@ mod tests {
     assert_eq!(*object, 500);
 
     *object = 50;
-    assert!(*object != 500);
     assert_eq!(*object, 50);
   }
 
   #[test]
   fn test_mut_alloc_clone() {
-    let mut slab_allocator = SlabAllocator::new(20);
+    let slab_allocator = SlabAllocator::new(20);
     let mut object = slab_allocator.alloc(239);
     let object2 = object.clone();
     let object3 = slab_allocator.alloc(77);
@@ -201,14 +237,14 @@ mod tests {
 
   #[test]
   fn test_one_alloc_boxed() {
-    let mut slab_allocator = box SlabAllocator::new(20);
+    let slab_allocator = box SlabAllocator::new(20);
     let object = slab_allocator.alloc(239);
     assert_eq!(*object, 239);
   }
 
   #[test]
   fn test_many_alloc() {
-    let mut slab_allocator = box SlabAllocator::new(20);
+    let slab_allocator = SlabAllocator::new(20);
 
     // Alloacting and verifying 20 items and putting into vector.
     let mut vec = Vec::new();
@@ -230,22 +266,10 @@ mod tests {
   #[should_fail]
   fn test_over_alloc() {
     // This test should pass after objects are able to be returned to allocator
-    let mut slab_allocator = box SlabAllocator::new(20);
+    let slab_allocator = box SlabAllocator::new(20);
     for i in range(0, 21) {
       let object = slab_allocator.alloc(i);
       assert_eq!(*object, i);
     }
   }
 }
-
-// fn main() {
-//   {
-//     println!("Allocator...");
-//     let mut slab_allocator = SlabAllocator::new(20);
-//     println!("Object...");
-//     let object = slab_allocator.alloc(54);
-//     println!("Equal...");
-//     assert_eq!(*object, 54);
-//   }
-//   println!("Done...");
-// }
