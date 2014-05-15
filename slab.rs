@@ -7,7 +7,7 @@
  *
  * let s = SlabAllocator::new(10);
  * {
- *   let first = s.alloc(0); // Type is Rc<Slab<int>>;
+ *   let first = s.alloc(0); // Type is SlabBox<'a, int>
  *   *first = 10;
  *
  *   let second = s.alloc(0);

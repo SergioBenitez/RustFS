@@ -1,0 +1,45 @@
+#![feature(globs)]
+
+extern crate time;
+extern crate collections;
+
+use file::{File, Directory, Empty};
+
+mod file;
+mod inode;
+
+trait DirectoryHandle {
+  fn is_dir(&self) -> bool;
+  fn insert(&mut self, name: ~str, file: Self);
+  fn get(&self, name: ~str) -> Self;
+}
+
+impl DirectoryHandle for File {
+  fn is_dir(&self) -> bool {
+    match self {
+      &Directory(_) => true,
+      _ => false
+    }
+  }
+
+  fn insert(&mut self, name: ~str, file: File) {
+    let rc = self.get_dir_rc();
+    let mut content = rc.borrow_mut();
+    content.entries.insert(name, file);
+  }
+
+  fn get(&self, name: ~str) -> File {
+    let rc = self.get_dir_rc();
+    let content = rc.borrow();
+    content.entries.get(&name).clone()
+  }
+}
+
+fn main() {
+  let mut dir = File::new_dir(); 
+  println!("{}", dir.is_dir());
+
+  let filename = "my_file".to_owned();
+  dir.insert("my_file".to_owned(), Empty);
+  println!("{:?}", dir.get(filename));
+}
