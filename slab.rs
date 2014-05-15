@@ -276,11 +276,48 @@ mod tests {
   }
 
   #[test]
-  fn test_over_alloc() {
+  fn test_alloc_return() {
     let slab_allocator = box SlabAllocator::new(20);
+
+    // Drop should be called for each object after each loop
     for i in range(0, 50) {
       let object = slab_allocator.alloc(i);
       assert_eq!(*object, i);
+    }
+
+    // Just in case some weird business is happenning
+    for i in range(-239, -180) {
+      let object = slab_allocator.alloc(i);
+      assert_eq!(*object, i);
+    }
+  }
+
+  #[test]
+  #[should_fail]
+  fn test_over_alloc() {
+    let slab_allocator = SlabAllocator::new(20);
+
+    // Alloacting more then the capacity
+    // Testing reference counting (by using clone), shouldn't drop
+    let mut vec = Vec::new();
+    for i in range(0, 25) {
+      let obj = slab_allocator.alloc(i);
+      assert_eq!(*obj, i);
+      vec.push(obj.clone());
+    }
+  }
+
+  #[test]
+  fn test_copy_return_alloc() {
+    let slab_allocator = SlabAllocator::new(20);
+
+    // Drop should be called for each object after each loop since we're only
+    // storing the value of the object and not the object itself
+    let mut vec = Vec::new();
+    for i in range(0, 25) {
+      let obj = slab_allocator.alloc(i);
+      assert_eq!(*obj, i);
+      vec.push(*obj);
     }
   }
 }
