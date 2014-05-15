@@ -5,7 +5,7 @@
  *
  * To use:
  *
- * let s = SlabAllocator::new();
+ * let s = SlabAllocator::new(10);
  * {
  *   let first = s.alloc(0); // Type is Rc<Slab<int>>;
  *   *first = 10;
@@ -65,7 +65,6 @@ impl<'a, T: Eq + Send> Eq for Slab<'a, T> {
 #[unsafe_destructor]
 impl<'a, T: Send> Drop for Slab<'a, T> {
   fn drop(&mut self) {
-    println!("I should be returned back to {:?}.", self.parent);
     self.parent.free(self.ptr);
   }
 }
@@ -110,7 +109,7 @@ struct SlabAllocator<T> {
 }
 
 impl<T: Send> SlabAllocator<T> {
-  fn new(initial_size: uint) -> SlabAllocator<T> {
+  pub fn new(initial_size: uint) -> SlabAllocator<T> {
     let mut allocator = SlabAllocator {
       items: Vec::with_capacity(initial_size),
       alloc: Cell::new(0),
@@ -136,9 +135,15 @@ impl<T: Send> SlabAllocator<T> {
     self.capacity.set(self.capacity.get() + new_items);
   }
 
-  fn alloc<'r>(&'r self, value: T) -> SlabBox<'r, T> {
-    let alloc = self.alloc.get();
-    if alloc >= self.capacity.get() { fail!("Out of memory."); }
+  pub fn alloc<'r>(&'r self, value: T) -> SlabBox<'r, T> {
+    let (alloc, capacity) = (self.alloc.get(), self.capacity.get());
+    if alloc >= capacity {
+      unsafe {
+        // is there a safe/better way to do something like this?
+        let mut_self: &mut SlabAllocator<T> = transmute(self);
+        mut_self.expand(capacity * 2 - capacity);
+      }
+    }
 
     let ptr: *mut T = *self.items.get(alloc);
     unsafe { mem::move_val_init(&mut *ptr, value); }
@@ -158,6 +163,10 @@ impl<T: Send> SlabAllocator<T> {
       let items: &mut [*mut T] = transmute(self.items.as_slice());
       items[alloc - 1] = ptr;
     }
+  }
+
+  pub fn get_stats(&self) -> (uint, uint) {
+    (self.alloc.get(), self.capacity.get())
   }
 }
 
@@ -293,7 +302,6 @@ mod tests {
   }
 
   #[test]
-  #[should_fail]
   fn test_over_alloc() {
     // This test should pass when allocator can grow.
     let slab_allocator = SlabAllocator::new(20);
@@ -301,11 +309,24 @@ mod tests {
     // Alloacting more then the capacity
     // Testing reference counting (by using clone), shouldn't drop
     let mut vec = Vec::new();
-    for i in range(0, 25) {
+    for i in range(0, 100) {
       let obj = slab_allocator.alloc(i);
       assert_eq!(*obj, i);
       vec.push(obj.clone());
     }
+
+    // Make sure the allocator performed as expected
+    let (allocated, capacity) = slab_allocator.get_stats();
+    assert_eq!(allocated, 100);
+    assert_eq!(capacity, 160); // 20 -> 40 -> 80 -> 160
+
+    // Get rid of all the references to the objects
+    vec.truncate(0);
+
+    // Make sure they were deallocated
+    let (allocated, capacity) = slab_allocator.get_stats();
+    assert_eq!(allocated, 0);
+    assert_eq!(capacity, 160); // 20 -> 40 -> 80 -> 160
   }
 
   #[test]
