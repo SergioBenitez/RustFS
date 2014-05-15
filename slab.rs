@@ -295,6 +295,7 @@ mod tests {
   #[test]
   #[should_fail]
   fn test_over_alloc() {
+    // This test should pass when allocator can grow.
     let slab_allocator = SlabAllocator::new(20);
 
     // Alloacting more then the capacity
