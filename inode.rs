@@ -140,11 +140,9 @@ mod tests {
   use rand::random;
   
   fn rand_array(size: uint) -> Vec<u8> {
-    let mut array = Vec::with_capacity(size);
-    for i in range(0, size) {
-      array.push(random::<u8>());
-    }
-    array
+    Vec::from_fn(size, |_| {
+      random::<u8>()
+    })
   }
 
   #[test]
