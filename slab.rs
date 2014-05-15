@@ -63,9 +63,10 @@ impl<'a, T: Eq + Send> Eq for Slab<'a, T> {
 }
 
 #[unsafe_destructor]
-impl<'a, T> Drop for Slab<'a, T> {
+impl<'a, T: Send> Drop for Slab<'a, T> {
   fn drop(&mut self) {
     println!("I should be returned back to {:?}.", self.parent);
+    self.parent.free(self.ptr);
   }
 }
 
@@ -145,6 +146,18 @@ impl<T: Send> SlabAllocator<T> {
     self.alloc.set(alloc + 1);
     let slab = Slab { parent: self, ptr: ptr }; 
     SlabBox(Rc::new(RefCell::new(slab)))
+  }
+
+  fn free(&self, ptr: *mut T) {
+    let alloc = self.alloc.get();
+    if alloc <= 0 { fail!("Over-freeing....somehow"); }
+
+    self.alloc.set(alloc - 1);
+    unsafe {
+      // Letting an immutable slice be mutable, unsafely
+      let items: &mut [*mut T] = transmute(self.items.as_slice());
+      items[alloc - 1] = ptr;
+    }
   }
 }
 
@@ -263,11 +276,9 @@ mod tests {
   }
 
   #[test]
-  #[should_fail]
   fn test_over_alloc() {
-    // This test should pass after objects are able to be returned to allocator
     let slab_allocator = box SlabAllocator::new(20);
-    for i in range(0, 21) {
+    for i in range(0, 50) {
       let object = slab_allocator.alloc(i);
       assert_eq!(*object, i);
     }
