@@ -165,7 +165,7 @@ impl<T: Send> SlabAllocator<T> {
     }
   }
 
-  pub fn get_stats(&self) -> (uint, uint) {
+  pub fn stats(&self) -> (uint, uint) {
     (self.alloc.get(), self.capacity.get())
   }
 }
@@ -174,6 +174,7 @@ impl<T: Send> SlabAllocator<T> {
 mod tests {
   extern crate test;
   use super::SlabAllocator;
+  use std::mem;
 
   #[test]
   fn test_one_mut_alloc() {
@@ -258,6 +259,49 @@ mod tests {
   }
 
   #[test]
+  fn test_mut_box_alloc() {
+    let slab_allocator = SlabAllocator::new(20);
+    let mut object = slab_allocator.alloc(box 1111);
+    assert_eq!(*object, box 1111);
+    assert_eq!(*object, *slab_allocator.alloc(box 1111));
+
+    let object2 = object.clone();
+    assert_eq!(*object, *object2);
+    let init_ptr: *int;
+    unsafe {
+      let ptr1: *int = mem::transmute(object.deref());
+      let ptr2: *int = mem::transmute(object2.deref());
+      init_ptr = ptr1;
+      assert_eq!(ptr1, ptr2); // make sure we're not allocating new internal box
+    }
+
+    *object = box 2222;
+    assert_eq!(*object, *object2);
+    assert_eq!(*object2, box 2222);
+    assert_eq!(**object2, 2222);
+
+    let mut object3 = object2.clone();
+    *object3 = box 3333;
+    assert_eq!(*object, box 3333);
+    assert_eq!(*object2, *object);
+    assert_eq!(*object, *object3);
+
+    unsafe {
+      let ptr1: *int = mem::transmute(object.deref());
+      let ptr2: *int = mem::transmute(object2.deref());
+      let ptr3: *int = mem::transmute(object3.deref());
+      assert_eq!(ptr1, ptr2); 
+      assert_eq!(ptr2, ptr3);
+
+      // this one is a bit interesting. after doing some tests, it looks like if
+      // you have a let mut a: Box<thing> and then you do a = box newthing, the
+      // box will continue being the same one and only the content inside will
+      // change, which is pretty cool.
+      assert_eq!(init_ptr, ptr1); // because they're boxes, ptr shouldn't change
+    }
+  }
+
+  #[test]
   fn test_one_alloc_boxed() {
     let slab_allocator = box SlabAllocator::new(20);
     let object = slab_allocator.alloc(239);
@@ -290,6 +334,10 @@ mod tests {
 
     // Drop should be called for each object after each loop
     for i in range(0, 50) {
+      // Making sure nothing's in there
+      let (alloc, _) = slab_allocator.stats();
+      assert_eq!(alloc, 0);
+
       let object = slab_allocator.alloc(i);
       assert_eq!(*object, i);
     }
@@ -299,6 +347,10 @@ mod tests {
       let object = slab_allocator.alloc(i);
       assert_eq!(*object, i);
     }
+
+    // Should still be empty
+    let (alloc, _) = slab_allocator.stats();
+    assert_eq!(alloc, 0);
   }
 
   #[test]
@@ -316,7 +368,7 @@ mod tests {
     }
 
     // Make sure the allocator performed as expected
-    let (allocated, capacity) = slab_allocator.get_stats();
+    let (allocated, capacity) = slab_allocator.stats();
     assert_eq!(allocated, 100);
     assert_eq!(capacity, 160); // 20 -> 40 -> 80 -> 160
 
@@ -324,7 +376,7 @@ mod tests {
     vec.truncate(0);
 
     // Make sure they were deallocated
-    let (allocated, capacity) = slab_allocator.get_stats();
+    let (allocated, capacity) = slab_allocator.stats();
     assert_eq!(allocated, 0);
     assert_eq!(capacity, 160); // 20 -> 40 -> 80 -> 160
   }
@@ -337,9 +389,15 @@ mod tests {
     // storing the value of the object and not the object itself
     let mut vec = Vec::new();
     for i in range(0, 25) {
+      let (alloc, _) = slab_allocator.stats();
+      assert_eq!(alloc, 0);
+
       let obj = slab_allocator.alloc(i);
       assert_eq!(*obj, i);
       vec.push(*obj);
     }
+
+    let (alloc, _) = slab_allocator.stats();
+    assert_eq!(alloc, 0);
   }
 }
