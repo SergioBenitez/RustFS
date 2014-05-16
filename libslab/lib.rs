@@ -7,29 +7,23 @@
  *
  * let s = SlabAllocator::new(10);
  * {
- *   let first = s.alloc(0); // Type is SlabBox<'a, int>
+ *   let mut first = s.alloc(0); // Type is SlabBox<'a, int>
  *   *first = 10;
+ *   assert_eq!(*first, 10);
  *
- *   let second = s.alloc(0);
+ *   let mut second = s.alloc(0);
  *   *second = 20;
+ *   assert_eq!(*first, 20);
+ *   assert_eq!(*second, *first);
  *
  *   let third = first.clone(); // Referencing same as first.
  *   assert!(*first == *third);
  *
- *   *third = 30;
- *   assert!(*third == 30);
- *   assert!(*first == *third);
- * } // Both first and second returned to allocator.
- *
- * How to do destruction of allocator and its slabs?
- *
- * Idea: Keep an unsafe pointer to the parent SlabAllocator (or perhaps a weak
- * RC link?). On drop of slab, check if the allocator is valid, somehow. If it 
- * is not, do nothing, if it is, return the slab. If the SlabAllocator is
- * dropped, then deallocate all of its memory.
- *
- * How to check if allocator is still alive? If the allocator keeps track of
- * all of its slabs, it can set a bit in the slab when it is deallocated.
+ *   *second = 30;
+ *   assert_eq!(*first == 30);
+ *   assert_eq!(*first == *third);
+ *   assert_eq!(*second == *third);
+ * } // first, second, third returned to allocator.
  */
 
 extern crate libc;
