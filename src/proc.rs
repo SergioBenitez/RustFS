@@ -16,12 +16,12 @@ mod inode;
 
 pub type FileDescriptor = int;
 
-static O_RDONLY: u32 =   (1 << 0);
-static O_WRONLY: u32 =   (1 << 1);
-static O_RDWR: u32 =     (1 << 2);
-static O_NONBLOCK: u32 = (1 << 3);
-static O_APPEND: u32 =   (1 << 4);
-static O_CREAT: u32 =    (1 << 5);
+pub static O_RDONLY: u32 =   (1 << 0);
+pub static O_WRONLY: u32 =   (1 << 1);
+pub static O_RDWR: u32 =     (1 << 2);
+pub static O_NONBLOCK: u32 = (1 << 3);
+pub static O_APPEND: u32 =   (1 << 4);
+pub static O_CREAT: u32 =    (1 << 5);
 
 pub struct Proc {
   cwd: File,
@@ -77,6 +77,7 @@ impl Proc {
 
   pub fn read(&self, fd: FileDescriptor, dst: &mut [u8]) -> uint {
     let handle = self.fd_table.get(&fd);
+    println!("{:?}", handle);
     handle.read(dst)
   }
 
@@ -104,7 +105,7 @@ mod proc_tests {
   extern crate test;
 
   use super::{Proc, O_RDWR, O_CREAT};
-  use file::{Whence, SeekSet};
+  use file::{SeekSet};
   use rand::random;
 
   fn rand_array(size: uint) -> Vec<u8> {
@@ -159,7 +160,6 @@ mod proc_tests {
     // the easiest way to do that it. In any case, it's important that it's done
     let fd4 = p.open(filename, O_RDWR);
     assert_eq!(fd4, -2);
+    fail!();
   }
 }
-
-fn main() {}

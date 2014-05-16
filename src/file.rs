@@ -79,6 +79,7 @@ impl FileHandle {
   }
 
   pub fn read(&self, dst: &mut [u8]) -> uint {
+    println!("reading...");
     let offset = self.seek.get();
     let inode_rc = self.file.get_inode_rc();
     let changed = inode_rc.borrow().read(offset, dst);
