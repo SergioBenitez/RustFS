@@ -2,9 +2,6 @@ extern crate time;
 
 use file::{File, Directory};
 
-mod file;
-mod inode;
-
 pub trait DirectoryHandle {
   fn is_dir(&self) -> bool;
   fn insert(&mut self, name: ~str, file: Self);

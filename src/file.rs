@@ -6,8 +6,6 @@ use std::rc::Rc;
 use std::cell::{Cell, RefCell};
 use inode::{Inode};
 
-mod inode;
-
 pub type RcDirContent = Rc<RefCell<Box<DirectoryContent>>>;
 pub type RcInode = Rc<RefCell<Box<Inode>>>;
 

@@ -160,6 +160,5 @@ mod proc_tests {
     // the easiest way to do that it. In any case, it's important that it's done
     let fd4 = p.open(filename, O_RDWR);
     assert_eq!(fd4, -2);
-    fail!();
   }
 }
