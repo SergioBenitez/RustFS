@@ -134,7 +134,6 @@ mod tests {
   extern crate rand;
 
   use super::{Inode};
-  use std::default::Default;
   use rand::random;
   
   fn rand_array(size: uint) -> Vec<u8> {

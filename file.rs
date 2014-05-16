@@ -3,7 +3,7 @@ extern crate collections;
 
 use collections::hashmap::HashMap;
 use std::rc::Rc;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use inode::{Inode};
 
 mod inode;
@@ -18,13 +18,13 @@ pub type RcInode = Rc<RefCell<Box<Inode>>>;
 pub enum File {
   DataFile(RcInode),
   Directory(RcDirContent),
-  Empty
+  EmptyFile
 }
 
 #[deriving(Clone)]
 pub struct FileHandle {
   file: File,
-  seek: uint
+  seek: Cell<uint>
 }
 
 #[deriving(Clone)]
@@ -74,29 +74,37 @@ impl FileHandle {
   pub fn new(file: File) -> FileHandle {
     FileHandle {
       file: file,
-      seek: 0
+      seek: Cell::new(0)
     }
   }
 
   pub fn read(&self, dst: &mut [u8]) -> uint {
+    let offset = self.seek.get();
     let inode_rc = self.file.get_inode_rc();
-    inode_rc.borrow().read(self.seek, dst)
+    let changed = inode_rc.borrow().read(offset, dst);
+    self.seek.set(offset + changed);
+    changed
   }
 
   pub fn write(&mut self, src: &[u8]) -> uint {
+    let offset = self.seek.get();
     let inode_rc = self.file.get_inode_rc();
-    inode_rc.borrow_mut().write(self.seek, src)
+    let changed = inode_rc.borrow_mut().write(offset, src);
+    self.seek.set(offset + changed);
+    changed
   }
 
   pub fn seek(&mut self, offset: int, whence: Whence) -> uint {
     let inode_rc = self.file.get_inode_rc();
 
-    self.seek = match whence {
+    let seek = self.seek.get();
+    let new_seek = match whence {
       SeekSet => offset as uint,
-      SeekCur => (self.seek as int + offset) as uint,
+      SeekCur => (seek as int + offset) as uint,
       SeekEnd => (inode_rc.borrow().size() as int + offset) as uint
     };
 
-    self.seek
+    self.seek.set(new_seek);
+    new_seek
   }
 }
