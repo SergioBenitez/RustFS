@@ -1,5 +1,3 @@
-#![feature(globs)]
-
 extern crate rand;
 extern crate time;
 
@@ -76,7 +74,7 @@ impl Inode {
       // the beginning of the block after the first time.
       if block_offset != 0 && i > 0 { block_offset = 0 };
 
-      // // Need to account for offsets from first and last blocks
+      // Need to account for offsets from first and last blocks
       let num_bytes = if i == blocks_to_act_on - 1 {
         data.len() - written
       } else {
@@ -106,7 +104,7 @@ impl Inode {
       // the beginning of the block after the first time.
       if block_offset != 0 && i > 0 { block_offset = 0 };
 
-      // // Need to account for offsets from first and last blocks
+      // Need to account for offsets from first and last blocks
       let num_bytes = if i == blocks_to_act_on - 1 {
         data.len() - read
       } else {
@@ -135,7 +133,7 @@ impl Inode {
 mod tests {
   extern crate rand;
 
-  use super::*;
+  use super::{Inode};
   use std::default::Default;
   use rand::random;
   
@@ -167,5 +165,3 @@ mod tests {
     }
   }
 }
-
-fn main() { }
