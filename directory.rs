@@ -1,17 +1,14 @@
-#![feature(globs)]
-
 extern crate time;
-extern crate collections;
 
 use file::{File, Directory};
 
 mod file;
 mod inode;
 
-trait DirectoryHandle {
+pub trait DirectoryHandle {
   fn is_dir(&self) -> bool;
   fn insert(&mut self, name: ~str, file: Self);
-  fn get(&self, name: ~str) -> Self;
+  fn get(&self, name: ~str) -> Option<Self>;
 }
 
 impl DirectoryHandle for File {
@@ -28,10 +25,11 @@ impl DirectoryHandle for File {
     content.entries.insert(name, file); // RC
   }
 
-  fn get(&self, name: ~str) -> File {
+  fn get(&self, name: ~str) -> Option<File> {
     let rc = self.get_dir_rc();
     let content = rc.borrow();
-    content.entries.get(&name).clone() // It's RC
+    // TODO: Return none when no file is there.
+    Some(content.entries.get(&name).clone()) // It's RC
   }
 }
 
@@ -48,8 +46,8 @@ fn main() {
   let filename = "my_file".to_owned();
   let inode = Rc::new(RefCell::new(box Inode::new()));
   let file = File::new_data_file(inode.clone());
-  dir.insert("my_file".to_owned(), file.clone());
+  dir.insert(filename, file.clone());
 
-  println!("{}: {:?}", filename, file.is_dir());
-  println!("{}: {:?}", filename, file);
+  // println!("{}: {:?}", filename, file.is_dir());
+  // println!("{}: {:?}", filename, file);
 }

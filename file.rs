@@ -70,6 +70,14 @@ impl File {
 }
 
 impl FileHandle {
+  // Probably not the right type.
+  pub fn new(file: File) -> FileHandle {
+    FileHandle {
+      file: file,
+      seek: 0
+    }
+  }
+
   pub fn read(&self, dst: &mut [u8]) -> uint {
     let inode_rc = self.file.get_inode_rc();
     inode_rc.borrow().read(self.seek, dst)
@@ -92,5 +100,3 @@ impl FileHandle {
     self.seek
   }
 }
-
-fn main() {}
