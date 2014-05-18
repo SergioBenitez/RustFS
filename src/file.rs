@@ -6,8 +6,8 @@ use std::rc::Rc;
 use std::cell::{Cell, RefCell};
 use inode::{Inode};
 
-pub type RcDirContent = Rc<RefCell<Box<DirectoryContent>>>;
-pub type RcInode = Rc<RefCell<Box<Inode>>>;
+type RcDirContent = Rc<RefCell<Box<DirectoryContent>>>;
+type RcInode = Rc<RefCell<Box<Inode>>>;
 
 // File is a thing wrapper around Inodes and Directories. The whole point is to
 // provide a layer of indirection. FileHandle's and Directory entries, then,
@@ -47,7 +47,6 @@ impl File {
     Directory(rc)
   }
 
-  // Don't quite want an inode - want an RC like inode
   pub fn new_data_file(inode: RcInode) -> File {
     DataFile(inode)
   }
@@ -77,7 +76,6 @@ impl FileHandle {
   }
 
   pub fn read(&self, dst: &mut [u8]) -> uint {
-    println!("reading...");
     let offset = self.seek.get();
     let inode_rc = self.file.get_inode_rc();
     let changed = inode_rc.borrow().read(offset, dst);

@@ -45,8 +45,6 @@ impl Proc {
   }
 
   pub fn open(&mut self, path: ~str, flags: u32) -> FileDescriptor {
-    println!("Lookup: {}", path);
-
     let lookup = self.cwd.get(&path);
     let file = match lookup {
       Some(f) => f,
@@ -77,7 +75,6 @@ impl Proc {
 
   pub fn read(&self, fd: FileDescriptor, dst: &mut [u8]) -> uint {
     let handle = self.fd_table.get(&fd);
-    println!("{:?}", handle);
     handle.read(dst)
   }
 
@@ -106,7 +103,10 @@ mod proc_tests {
 
   use super::{Proc, O_RDWR, O_CREAT};
   use file::{SeekSet};
+  use inode::Inode;
   use rand::random;
+
+  static mut test_inode_drop: bool = false;
 
   fn rand_array(size: uint) -> Vec<u8> {
     Vec::from_fn(size, |_| {
@@ -155,10 +155,60 @@ mod proc_tests {
 
     p.unlink(&filename);
 
-    // Verify file is no longer there
-    // TODO: Verify that the data was indeed deallocated, but it's unclear what
-    // the easiest way to do that it. In any case, it's important that it's done
     let fd4 = p.open(filename, O_RDWR);
     assert_eq!(fd4, -2);
+  }
+
+  /**
+   * This function makes sure that on unlink, the inode's data structure is
+   * indeed dropped. This means that a few things have gone right:
+   *
+   * 1) The FileHandle was dropped. If it wasn't, it would hold a reference to
+   *    the file and so the file wouldn't be dropped. This should happen on
+   *    close.
+   * 2) The File, containing the Inode, was dropped. This should happen on
+   *    unlink.
+   */
+  #[test]
+  #[should_fail]
+  fn test_inode_dealloc() {
+    // Variable is used to make sure that the Drop implemented is only valid for
+    // tests that set that test_inode_drop global variable to true.
+    unsafe { test_inode_drop = true; }
+
+    impl Drop for Inode {
+      fn drop(&mut self) {
+        unsafe { 
+          if test_inode_drop {
+            test_inode_drop = false;
+            fail!("Dropping.");
+          }
+        }
+      }
+    }
+
+    static size: uint = 4096;
+    let mut p = Proc::new();
+    let data = rand_array(size);
+    let mut buf = [0u8, ..size];
+    let filename = "first_file".to_owned();
+
+    let fd = p.open(filename.clone(), O_RDWR | O_CREAT);
+    p.write(fd, data.as_slice());
+    p.seek(fd, 0, SeekSet);
+    p.read(fd, buf);
+
+    assert_eq_buf(data.as_slice(), buf);
+
+    p.close(fd);
+    p.unlink(&filename);
+    
+    // If inode is not being dropped properly, ie, on the unlink call this will
+    // cause a double failure: once for fail! call, and once when then the Inode
+    // is dropped since the Proc structure will be dropped.
+    //
+    // To test that RC is working problem, make sure that a double failure
+    // occurs when either th close or unlink calls above are commented out.
+    fail!("Inode not dropped!");
   }
 }

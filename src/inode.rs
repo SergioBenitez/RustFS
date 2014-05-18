@@ -159,7 +159,6 @@ mod tests {
 
     // Make sure contents are correct
     for i in range(0, size) {
-      println!("buf: {}, actual: {}", buf[i], original_data.get(i));
       assert_eq!(buf[i], *original_data.get(i));
     }
   }
