@@ -30,6 +30,7 @@
 extern crate libc;
 
 use std::mem;
+use std::ptr;
 use std::mem::transmute;
 use std::rc::Rc;
 use libc::{size_t, malloc};
@@ -154,6 +155,9 @@ impl<T: Send> SlabAllocator<T> {
 
     self.alloc.set(alloc - 1);
     unsafe {
+      // Moving to the stack so drop glue runs
+      ptr::read(ptr as *T);
+
       // Letting an immutable slice be mutable, unsafely
       let items: &mut [*mut T] = transmute(self.items.as_slice());
       items[alloc - 1] = ptr;
@@ -171,6 +175,20 @@ mod tests {
   use super::SlabAllocator;
   use std::mem;
 
+  // Used to test that deallocation works.
+  #[deriving(Eq, Show, Clone)]
+  struct MyThing {
+    field1: Option<Box<int>>,
+    done: bool
+  }
+
+  impl Drop for MyThing {
+    fn drop(&mut self) {
+      println!("Being dropped.");
+      if !self.done { fail!("Should not be dropped: {}", self.done); }
+    }
+  }
+
   #[test]
   fn test_one_mut_alloc() {
     let slab_allocator = SlabAllocator::new(20);
@@ -181,18 +199,6 @@ mod tests {
 
   #[test]
   fn test_one_struct_alloc() {
-    #[deriving(Eq, Show, Clone)]
-    struct MyThing {
-      field1: Option<Box<int>>,
-      done: bool
-    }
-
-    impl Drop for MyThing {
-      fn drop(&mut self) {
-        if !self.done { fail!("Should not be dropped: {}", self.done); }
-      }
-    }
-    
     let slab_allocator = SlabAllocator::new(20);
     let struct_obj = MyThing { field1: Some(box 20), done: false };
     let mut object = slab_allocator.alloc(struct_obj);
@@ -207,6 +213,28 @@ mod tests {
 
     assert_eq!(object.field1, Some(box 40)); // same as (*object).field1
     object.done = true;
+  }
+
+  #[test]
+  #[should_fail]
+  fn test_struct_dealloc() {
+    let slab_allocator = SlabAllocator::new(20);
+    {
+      let struct_obj = MyThing { field1: Some(box 20), done: false };
+      let object = slab_allocator.alloc(struct_obj);
+      assert_eq!(object.field1, Some(box 20));
+    }
+  }
+
+  #[test]
+  #[should_fail]
+  fn test_box_struct_dealloc() {
+    let slab_allocator = SlabAllocator::new(20);
+    {
+      let struct_obj = box MyThing { field1: Some(box 2445), done: false };
+      let object = slab_allocator.alloc(struct_obj);
+      assert_eq!(object.field1, Some(box 2445));
+    }
   }
 
   #[test]

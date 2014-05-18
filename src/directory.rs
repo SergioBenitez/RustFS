@@ -39,21 +39,3 @@ impl DirectoryHandle for File {
     }
   }
 }
-
-// fn main() {
-//   use inode::Inode;
-//   use std::clone::Clone;
-//   use std::rc::Rc;
-//   use std::cell::RefCell;
-
-//   let mut dir = File::new_dir(); 
-//   println!("{}", dir.is_dir());
-
-//   let filename = "my_file".to_owned();
-//   let inode = Rc::new(RefCell::new(box Inode::new()));
-//   let file = File::new_data_file(inode.clone());
-//   dir.insert(filename, file.clone());
-
-//   // println!("{}: {:?}", filename, file.is_dir());
-//   // println!("{}: {:?}", filename, file);
-// }
