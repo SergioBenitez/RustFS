@@ -11,7 +11,7 @@ static LIST_SIZE: uint = 256;
 type Page = Box<([u8, ..PAGE_SIZE])>;
 type Entry = Option<Page>;
 type TList<T> = Box<([T, ..LIST_SIZE])>;
-type EntryList = TList<Entry>;
+type EntryList = TList<Entry>; // TODO: Option<TList> for lazy loading
 type DoubleEntryList = TList<Box<EntryList>>;
 
 #[inline(always)]

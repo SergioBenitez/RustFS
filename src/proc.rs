@@ -207,8 +207,8 @@ mod proc_tests {
     // cause a double failure: once for fail! call, and once when then the Inode
     // is dropped since the Proc structure will be dropped.
     //
-    // To test that RC is working problem, make sure that a double failure
-    // occurs when either th close or unlink calls above are commented out.
+    // To test that RC is working properly, make sure that a double failure
+    // occurs when either the close or unlink calls above are commented out.
     fail!("Inode not dropped!");
   }
 }

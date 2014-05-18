@@ -30,11 +30,11 @@
 extern crate libc;
 
 use std::mem;
-use std::ptr;
 use std::mem::transmute;
 use std::rc::Rc;
 use libc::{size_t, malloc};
 use std::cell::{Cell, RefCell};
+use std::intrinsics;
 
 #[deriving(Show)]
 struct Slab<'a, T> {
@@ -164,8 +164,11 @@ impl<T: Send> SlabAllocator<T> {
 
     self.alloc.set(alloc - 1);
     unsafe {
-      // Moving to the stack so drop glue runs
-      ptr::read(ptr as *T);
+      // Dropping if needed
+      if intrinsics::needs_drop::<T>() {
+        let ty = intrinsics::get_tydesc::<T>();
+        ((*ty).drop_glue)(ptr as *i8);
+      }
 
       // Letting an immutable slice be mutable, unsafely
       let items: &mut [*mut T] = transmute(self.items.as_slice());
