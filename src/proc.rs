@@ -211,4 +211,38 @@ mod proc_tests {
     // occurs when either the close or unlink calls above are commented out.
     fail!("Inode not dropped!");
   }
+
+  #[test]
+  fn test_max_file_size() {
+    static size: uint = 4096 * 256;
+    let mut p = Proc::new();
+    let data = rand_array(size);
+    let mut buf = [0u8, ..size];
+    let filename = "first_file".to_owned();
+
+    let fd = p.open(filename.clone(), O_RDWR | O_CREAT);
+    p.write(fd, data.as_slice());
+    p.seek(fd, 0, SeekSet);
+    p.read(fd, buf);
+    
+    assert_eq_buf(data.as_slice(), buf);
+
+    p.close(fd);
+    p.unlink(&filename);
+
+    let fd4 = p.open(filename, O_RDWR);
+    assert_eq!(fd4, -2);
+  }
+
+  #[test]
+  #[should_fail]
+  fn test_morethan_max_file_size() {
+    static size: uint = 4096 * 256 + 1;
+    let mut p = Proc::new();
+    let data = rand_array(size);
+    let filename = "first_file".to_owned();
+
+    let fd = p.open(filename.clone(), O_RDWR | O_CREAT);
+    p.write(fd, data.as_slice());
+  }
 }

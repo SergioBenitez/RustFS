@@ -48,6 +48,8 @@ impl Inode {
   }
 
   fn get_or_alloc_page<'a>(&'a mut self, num: uint) -> &'a mut Page {
+    if num >= LIST_SIZE { fail!("Maximum file size exceeded!") };
+
     let page = &mut self.single[num];
     match page {
       &None => {
