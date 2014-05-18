@@ -131,6 +131,15 @@ impl<T: Send> SlabAllocator<T> {
     self.capacity.set(self.capacity.get() + new_items);
   }
 
+  /**
+   * TODO: Have a way to return possibly dirty objects.
+   *
+   * Idea: value of type Option<T>. Then, if Some, use the value inside as the
+   * initial value of the slab allocated object. If none, give unclean memory.
+   * 
+   * Alternatively, have an alloc_dirty that always returns possibly dirty
+   * values.
+   */
   pub fn alloc<'r>(&'r self, value: T) -> SlabBox<'r, T> {
     let (alloc, capacity) = (self.alloc.get(), self.capacity.get());
     if alloc >= capacity {
