@@ -184,7 +184,7 @@ impl<T> SlabAllocator<T> {
 #[cfg(test)]
 mod tests {
   extern crate test;
-  use super::SlabAllocator;
+  use super::{SlabAllocator, SlabBox};
   use std::mem;
 
   // Used to test that deallocation works.
@@ -439,4 +439,79 @@ mod tests {
     let (alloc, _) = slab_allocator.stats();
     assert_eq!(alloc, 0);
   }
+
+  #[test]
+  fn test_usage_external_allocator() {
+    struct MyThing<'r> {
+      item: SlabBox<'r, int>,
+      allocator: &'r SlabAllocator<int>,
+      val: int
+    }
+
+    impl<'r> MyThing<'r> {
+      fn new(allocator: &'r SlabAllocator<int>, num: int) -> MyThing<'r> {
+        MyThing {
+          item: allocator.alloc(num),
+          allocator: allocator,
+          val: num
+        }
+      }
+
+      fn set_num(&'r mut self, num: int) {
+        self.val = num;
+      }
+    }
+
+    let allocator = SlabAllocator::new(10);
+    let thing = MyThing::new(&allocator, 120);
+    let thing2 = MyThing::new(&allocator, 130);
+
+    assert_eq!(*thing.item, 120);
+    assert_eq!(*thing2.item, 130);
+
+    let (alloc, _) = allocator.stats();
+    assert_eq!(alloc, 2);
+
+    // This should be possible, but Rust and its issues aboard!
+    // https://github.com/mozilla/rust/issues/6393
+    // thing.set_num(434);
+    // assert_eq!(*thing.item, 120);
+    // assert_eq!(*thing2.item, 130);
+
+    // let (alloc, _) = allocator.stats();
+    // assert_eq!(alloc, 2);
+  }
+
+  // // Not sure if this is possible.
+  // #[test]
+  // fn test_usage_internal_allocator() {
+  //   struct MyThing<'r> {
+  //     item: Option<SlabBox<'r, int>>,
+  //     allocator: SlabAllocator<int>
+  //   }
+
+  //   impl<'r> MyThing<'r> {
+  //     fn new<'a>(num: int) -> MyThing<'a> {
+  //       let mut thing = MyThing {
+  //         item: None,
+  //         allocator: SlabAllocator::new(10)
+  //       };
+
+  //       thing.init(num);
+  //       thing
+  //     }
+
+  //     fn init(&'r mut self, num: int) {
+  //       let item: SlabBox<'r, int> = self.allocator.alloc(num);
+  //       self.item = Some(item);
+  //     }
+  //   }
+
+  //   let thing = MyThing::new::<'r>(120);
+
+  //   // let thing2 = MyThing::new();
+
+  //   assert_eq!(**thing.item.get_ref(), 120);
+  //   // assert_eq!(*thing2.item, 130);
+  // }
 }
