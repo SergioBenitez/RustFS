@@ -445,7 +445,6 @@ mod tests {
     struct MyThing<'r> {
       item: SlabBox<'r, int>,
       allocator: &'r SlabAllocator<int>,
-      val: int
     }
 
     impl<'r> MyThing<'r> {
@@ -453,17 +452,16 @@ mod tests {
         MyThing {
           item: allocator.alloc(num),
           allocator: allocator,
-          val: num
         }
       }
 
-      fn set_num(&'r mut self, num: int) {
-        self.val = num;
+      fn set_num(&mut self, num: int) {
+        self.item = self.allocator.alloc(num);
       }
     }
 
     let allocator = SlabAllocator::new(10);
-    let thing = MyThing::new(&allocator, 120);
+    let mut thing = MyThing::new(&allocator, 120);
     let thing2 = MyThing::new(&allocator, 130);
 
     assert_eq!(*thing.item, 120);
@@ -472,17 +470,15 @@ mod tests {
     let (alloc, _) = allocator.stats();
     assert_eq!(alloc, 2);
 
-    // This should be possible, but Rust and its issues aboard!
-    // https://github.com/mozilla/rust/issues/6393
-    // thing.set_num(434);
-    // assert_eq!(*thing.item, 120);
-    // assert_eq!(*thing2.item, 130);
+    thing.set_num(434);
+    assert_eq!(*thing.item, 434);
+    assert_eq!(*thing2.item, 130);
 
-    // let (alloc, _) = allocator.stats();
-    // assert_eq!(alloc, 2);
+    let (alloc, _) = allocator.stats();
+    assert_eq!(alloc, 2);
   }
 
-  // // Not sure if this is possible.
+  // Not sure if this is possible.
   // #[test]
   // fn test_usage_internal_allocator() {
   //   struct MyThing<'r> {
@@ -497,17 +493,18 @@ mod tests {
   //         allocator: SlabAllocator::new(10)
   //       };
 
-  //       thing.init(num);
   //       thing
   //     }
 
   //     fn init(&'r mut self, num: int) {
-  //       let item: SlabBox<'r, int> = self.allocator.alloc(num);
+  //       let allocator = &self.allocator;
+  //       let item: SlabBox<'r, int> = allocator.alloc(num);
   //       self.item = Some(item);
   //     }
   //   }
 
-  //   let thing = MyThing::new::<'r>(120);
+  //   let mut thing = MyThing::new(120);
+  //   thing.init(120);
 
   //   // let thing2 = MyThing::new();
 
