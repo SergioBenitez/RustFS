@@ -38,11 +38,11 @@ use std::intrinsics;
 
 #[deriving(Show)]
 struct Slab<'a, T> {
-  parent: &'a SlabAllocator<T>,
+  parent: &'a SlabAllocator<T>, // Would RC be better to get rid of 'a? How to?
   ptr: *mut T
 }
 
-impl<'a, T: Send> Slab<'a, T> {
+impl<'a, T> Slab<'a, T> {
   fn borrow<'r>(&'r self) -> &'r T {
     unsafe { &*self.ptr }
   }
@@ -52,14 +52,14 @@ impl<'a, T: Send> Slab<'a, T> {
   }
 }
 
-impl<'a, T: Eq + Send> Eq for Slab<'a, T> {
+impl<'a, T: Eq> Eq for Slab<'a, T> {
   fn eq(&self, other: &Slab<T>) -> bool {
     self.borrow() == other.borrow()
   }
 }
 
 #[unsafe_destructor]
-impl<'a, T: Send> Drop for Slab<'a, T> {
+impl<'a, T> Drop for Slab<'a, T> {
   fn drop(&mut self) {
     self.parent.free(self.ptr);
   }
@@ -68,7 +68,7 @@ impl<'a, T: Send> Drop for Slab<'a, T> {
 #[deriving(Clone)]
 pub struct SlabBox<'a, T>(Rc<RefCell<Slab<'a, T>>>);
 
-impl<'a, T: Send> SlabBox<'a, T> {
+impl<'a, T> SlabBox<'a, T> {
   #[inline(always)]
   pub fn borrow<'r>(&'r self) -> &'r T {
     let SlabBox(ref rc) = *self;
@@ -76,20 +76,20 @@ impl<'a, T: Send> SlabBox<'a, T> {
   }
 
   #[inline(always)]
-  pub fn borrow_mut<'r>(&'r self) -> &'r mut T {
+  pub fn borrow_mut<'r>(&'r mut self) -> &'r mut T {
     let SlabBox(ref rc) = *self;
     unsafe { transmute(rc.borrow_mut().borrow_mut()) }
   }
 }
 
-impl<'a, T: Send> Deref<T> for SlabBox<'a, T> {
+impl<'a, T> Deref<T> for SlabBox<'a, T> {
   #[inline(always)]
   fn deref<'r>(&'r self) -> &'r T {
     self.borrow()
   }
 }
 
-impl<'a, T: Send> DerefMut<T> for SlabBox<'a, T> {
+impl<'a, T> DerefMut<T> for SlabBox<'a, T> {
   #[inline(always)]
   fn deref_mut<'r>(&'r mut self) -> &'r mut T {
     self.borrow_mut()
@@ -104,7 +104,7 @@ pub struct SlabAllocator<T> {
 
 }
 
-impl<T: Send> SlabAllocator<T> {
+impl<T> SlabAllocator<T> {
   pub fn new(initial_size: uint) -> SlabAllocator<T> {
     let mut allocator = SlabAllocator {
       items: Vec::with_capacity(initial_size),
@@ -236,6 +236,8 @@ mod tests {
       let object = slab_allocator.alloc(struct_obj);
       assert_eq!(object.field1, Some(box 20));
     }
+    // Will cause double-fail if deallocation didn't occur.
+    fail!("Did not dallocate struct in time.");
   }
 
   #[test]
@@ -247,6 +249,8 @@ mod tests {
       let object = slab_allocator.alloc(struct_obj);
       assert_eq!(object.field1, Some(box 2445));
     }
+    // Will cause double-fail if deallocation didn't occur.
+    fail!("Did not dallocate struct in time.");
   }
 
   #[test]

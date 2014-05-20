@@ -35,6 +35,7 @@ Session.vim
 *.elf
 
 # Libraries
+*.rlib
 *.lib
 *.a
 

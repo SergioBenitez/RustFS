@@ -1,5 +1,3 @@
-extern crate time;
-
 use file::{File, Directory};
 
 pub trait DirectoryHandle {
@@ -20,7 +18,7 @@ impl DirectoryHandle for File {
   fn insert(&mut self, name: ~str, file: File) {
     let rc = self.get_dir_rc();
     let mut content = rc.borrow_mut();
-    content.entries.insert(name, file); // RC
+    content.entries.insert(name, file);
   }
 
   fn remove(&mut self, name: &~str) {
@@ -32,10 +30,9 @@ impl DirectoryHandle for File {
   fn get(&self, name: &~str) -> Option<File> {
     let rc = self.get_dir_rc();
     let content = rc.borrow();
-    // TODO: Return none when no file is there.
     match content.entries.find(name) {
       None => None,
-      Some(file) => Some(file.clone()) // It's RC
+      Some(ref file) => Some((*file).clone()) // It's RC
     }
   }
 }

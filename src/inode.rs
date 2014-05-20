@@ -1,6 +1,4 @@
-extern crate rand;
-extern crate time;
-
+use time;
 use time::Timespec;
 use std::mem;
 use std::slice::MutableCloneableVector;
