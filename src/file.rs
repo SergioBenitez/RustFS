@@ -5,6 +5,7 @@ use collections::hashmap::HashMap;
 use std::rc::Rc;
 use std::cell::{Cell, RefCell};
 use inode::{Inode};
+use directory::DirectoryHandle;
 
 type RcDirContent = Rc<RefCell<Box<DirectoryContent>>>;
 type RcInode = Rc<RefCell<Box<Inode>>>;
@@ -41,10 +42,24 @@ trait DataFile {
 }
 
 impl File {
-  pub fn new_dir() -> File {
+  pub fn new_dir(parent: Option<File>) -> File {
     let content = box DirectoryContent { entries: HashMap::new() };
     let rc = Rc::new(RefCell::new(content));
-    Directory(rc)
+    let dir = Directory(rc);
+
+    // Note that dir is RCd, so this is cheap
+    // Used to borrow dir and mut_dir at "same time"
+    // RefCell makes sure we're not doing anything wrong
+    let mut mut_dir = dir.clone();
+
+    // Setting up "." and ".."
+    mut_dir.insert(".".to_owned(), dir.clone());
+    match parent {
+      None => mut_dir.insert("..".to_owned(), dir.clone()),
+      Some(f) => mut_dir.insert("..".to_owned(), f)
+    }
+
+    dir
   }
 
   pub fn new_data_file(inode: RcInode) -> File {

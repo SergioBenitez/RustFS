@@ -32,7 +32,7 @@ pub struct Proc {
 impl Proc {
   pub fn new() -> Proc {
     Proc {
-      cwd: File::new_dir(),
+      cwd: File::new_dir(None),
       fd_table: HashMap::new(),
       last_fd: Cell::new(2)
     }
