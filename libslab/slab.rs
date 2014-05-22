@@ -479,36 +479,55 @@ mod tests {
   }
 
   // Not sure if this is possible.
-  // #[test]
-  // fn test_usage_internal_allocator() {
-  //   struct MyThing<'r> {
-  //     item: Option<SlabBox<'r, int>>,
-  //     allocator: SlabAllocator<int>
-  //   }
+  #[test]
+  fn test_usage_internal_allocator() {
+    use std::cell::RefCell;
 
-  //   impl<'r> MyThing<'r> {
-  //     fn new<'a>(num: int) -> MyThing<'a> {
-  //       let mut thing = MyThing {
-  //         item: None,
-  //         allocator: SlabAllocator::new(10)
-  //       };
+    struct MyThing<'r> {
+      item: RefCell<Option<SlabBox<'r, int>>>,
+      allocator: SlabAllocator<int>
+    }
 
-  //       thing
-  //     }
+    impl<'r> MyThing<'r> {
+      fn new() -> MyThing {
+        let thing = MyThing {
+          item: RefCell::new(None),
+          allocator: SlabAllocator::new(10)
+        };
 
-  //     fn init(&'r mut self, num: int) {
-  //       let allocator = &self.allocator;
-  //       let item: SlabBox<'r, int> = allocator.alloc(num);
-  //       self.item = Some(item);
-  //     }
-  //   }
+        thing
+      }
 
-  //   let mut thing = MyThing::new(120);
-  //   thing.init(120);
+      fn set(&'r self, num: int) {
+        *self.item.borrow_mut() = Some(self.allocator.alloc(num));
+      }
 
-  //   // let thing2 = MyThing::new();
+      fn item(&'r self) -> SlabBox<'r, int> {
+        self.item.borrow().get_ref().clone()
+      }
+    }
 
-  //   assert_eq!(**thing.item.get_ref(), 120);
-  //   // assert_eq!(*thing2.item, 130);
-  // }
+    // Ideally, this would work.
+    // let thing = MyThing::new(120);
+    // assert!(**thing.item() == 120);
+    
+    let thing = MyThing::new();
+
+    thing.set(127);
+    assert!(*thing.item() == 127);
+
+    thing.set(50);
+    assert!(*thing.item() == 50);
+
+    let (alloc, _) = thing.allocator.stats();
+    assert_eq!(alloc, 1);
+
+    let oldthing = thing.item();
+    thing.set(120);
+    assert_eq!(*oldthing, 50);
+    assert_eq!(*thing.item(), 120);
+
+    let (alloc, _) = thing.allocator.stats();
+    assert_eq!(alloc, 2);
+  }
 }
