@@ -23,13 +23,13 @@ pub static O_NONBLOCK: u32 = (1 << 3);
 pub static O_APPEND: u32 =   (1 << 4);
 pub static O_CREAT: u32 =    (1 << 5);
 
-pub struct Proc {
-  cwd: File,
-  fd_table: HashMap<FileDescriptor, FileHandle>,
+pub struct Proc<'r> {
+  cwd: File<'r>,
+  fd_table: HashMap<FileDescriptor, FileHandle<'r>>,
   last_fd: Cell<int>
 }
 
-impl Proc {
+impl<'r> Proc<'r> {
   pub fn new() -> Proc {
     Proc {
       cwd: File::new_dir(None),
@@ -44,8 +44,8 @@ impl Proc {
     fd
   }
 
-  pub fn open(&mut self, path: ~str, flags: u32) -> FileDescriptor {
-    let lookup = self.cwd.get(&path);
+  pub fn open(&mut self, path: &'r str, flags: u32) -> FileDescriptor {
+    let lookup = self.cwd.get(path);
     let file = match lookup {
       Some(f) => f,
       None => {
@@ -92,7 +92,7 @@ impl Proc {
     self.fd_table.remove(&fd);
   }
 
-  pub fn unlink(&mut self, path: &~str) {
+  pub fn unlink(&mut self, path: &'r str) {
     self.cwd.remove(path);
   }
 }
@@ -128,16 +128,16 @@ mod proc_tests {
     let mut p = Proc::new();
     let data = rand_array(size);
     let mut buf = [0u8, ..size];
-    let filename = "first_file".to_owned();
+    let filename = "first_file";
 
-    let fd = p.open(filename.clone(), O_RDWR | O_CREAT);
+    let fd = p.open(filename, O_RDWR | O_CREAT);
     p.write(fd, data.as_slice());
     p.seek(fd, 0, SeekSet);
     p.read(fd, buf);
     
     assert_eq_buf(data.as_slice(), buf);
 
-    let fd2 = p.open(filename.clone(), O_RDWR);
+    let fd2 = p.open(filename, O_RDWR);
     let mut buf2 = [0u8, ..size];
     p.read(fd2, buf2);
 
@@ -146,14 +146,14 @@ mod proc_tests {
     p.close(fd);
     p.close(fd2);
 
-    let fd3 = p.open(filename.clone(), O_RDWR);
+    let fd3 = p.open(filename, O_RDWR);
     let mut buf3 = [0u8, ..size];
     p.read(fd3, buf3);
 
     assert_eq_buf(data.as_slice(), buf3);
     p.close(fd3);
 
-    p.unlink(&filename);
+    p.unlink(filename);
 
     let fd4 = p.open(filename, O_RDWR);
     assert_eq!(fd4, -2);
@@ -191,9 +191,9 @@ mod proc_tests {
     let mut p = Proc::new();
     let data = rand_array(size);
     let mut buf = [0u8, ..size];
-    let filename = "first_file".to_owned();
+    let filename = "first_file";
 
-    let fd = p.open(filename.clone(), O_RDWR | O_CREAT);
+    let fd = p.open(filename, O_RDWR | O_CREAT);
     p.write(fd, data.as_slice());
     p.seek(fd, 0, SeekSet);
     p.read(fd, buf);
@@ -201,7 +201,7 @@ mod proc_tests {
     assert_eq_buf(data.as_slice(), buf);
 
     p.close(fd);
-    p.unlink(&filename);
+    p.unlink(filename);
     
     // If inode is not being dropped properly, ie, on the unlink call this will
     // cause a double failure: once for fail! call, and once when then the Inode
@@ -218,9 +218,9 @@ mod proc_tests {
     let mut p = Proc::new();
     let data = rand_array(size);
     let mut buf = [0u8, ..size];
-    let filename = "first_file".to_owned();
+    let filename = "first_file";
 
-    let fd = p.open(filename.clone(), O_RDWR | O_CREAT);
+    let fd = p.open(filename, O_RDWR | O_CREAT);
     p.write(fd, data.as_slice());
     p.seek(fd, 0, SeekSet);
     p.read(fd, buf);
@@ -228,7 +228,7 @@ mod proc_tests {
     assert_eq_buf(data.as_slice(), buf);
 
     p.close(fd);
-    p.unlink(&filename);
+    p.unlink(filename);
 
     let fd4 = p.open(filename, O_RDWR);
     assert_eq!(fd4, -2);
@@ -240,9 +240,9 @@ mod proc_tests {
     static size: uint = 4096 * 256 + 1;
     let mut p = Proc::new();
     let data = rand_array(size);
-    let filename = "first_file".to_owned();
+    let filename = "first_file";
 
-    let fd = p.open(filename.clone(), O_RDWR | O_CREAT);
+    let fd = p.open(filename, O_RDWR | O_CREAT);
     p.write(fd, data.as_slice());
   }
 }

@@ -1,13 +1,13 @@
 use file::{File, Directory};
 
-pub trait DirectoryHandle {
+pub trait DirectoryHandle<'r> {
   fn is_dir(&self) -> bool;
-  fn insert(&mut self, name: ~str, file: Self);
-  fn remove(&mut self, name: &~str);
-  fn get(&self, name: &~str) -> Option<Self>;
+  fn insert(&mut self, name: &'r str, file: Self);
+  fn remove(&mut self, name: &'r str);
+  fn get(&self, name: &'r str) -> Option<Self>;
 }
 
-impl DirectoryHandle for File {
+impl<'r> DirectoryHandle<'r> for File<'r> {
   fn is_dir(&self) -> bool {
     match self {
       &Directory(_) => true,
@@ -15,22 +15,22 @@ impl DirectoryHandle for File {
     }
   }
 
-  fn insert(&mut self, name: ~str, file: File) {
+  fn insert(&mut self, name: &'r str, file: File<'r>) {
     let rc = self.get_dir_rc();
     let mut content = rc.borrow_mut();
     content.entries.insert(name, file);
   }
 
-  fn remove(&mut self, name: &~str) {
+  fn remove(&mut self, name: &'r str) {
     let rc = self.get_dir_rc();
     let mut content = rc.borrow_mut();
-    content.entries.remove(name);
+    content.entries.remove(&name);
   }
 
-  fn get(&self, name: &~str) -> Option<File> {
+  fn get(&self, name: &'r str) -> Option<File<'r>> {
     let rc = self.get_dir_rc();
     let content = rc.borrow();
-    match content.entries.find(name) {
+    match content.entries.find(&name) {
       None => None,
       Some(ref file) => Some((*file).clone()) // It's RC
     }

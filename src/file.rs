@@ -7,28 +7,28 @@ use std::cell::{Cell, RefCell};
 use inode::{Inode};
 use directory::DirectoryHandle;
 
-type RcDirContent = Rc<RefCell<Box<DirectoryContent>>>;
+type RcDirContent<'r> = Rc<RefCell<Box<DirectoryContent<'r>>>>;
 type RcInode = Rc<RefCell<Box<Inode>>>;
 
 // File is a thing wrapper around Inodes and Directories. The whole point is to
 // provide a layer of indirection. FileHandle's and Directory entries, then,
 // point to these guys instead of directly to Inodes/Directories
 #[deriving(Clone)]
-pub enum File {
+pub enum File<'r> {
   DataFile(RcInode),
-  Directory(RcDirContent),
+  Directory(RcDirContent<'r>),
   EmptyFile
 }
 
 #[deriving(Clone)]
-pub struct FileHandle {
-  file: File,
+pub struct FileHandle<'r> {
+  file: File<'r>,
   seek: Cell<uint>
 }
 
 #[deriving(Clone)]
-pub struct DirectoryContent {
-  pub entries: HashMap<~str, File>
+pub struct DirectoryContent<'r> {
+  pub entries: HashMap<&'r str, File<'r>>
 }
 
 pub enum Whence {
@@ -37,12 +37,8 @@ pub enum Whence {
   SeekEnd
 }
 
-trait DataFile {
-  fn is_data_file(&self) -> bool;
-}
-
-impl File {
-  pub fn new_dir(parent: Option<File>) -> File {
+impl<'r> File<'r> {
+  pub fn new_dir(parent: Option<File<'r>>) -> File<'r> {
     let content = box DirectoryContent { entries: HashMap::new() };
     let rc = Rc::new(RefCell::new(content));
     let dir = Directory(rc);
@@ -53,10 +49,10 @@ impl File {
     let mut mut_dir = dir.clone();
 
     // Setting up "." and ".."
-    mut_dir.insert(".".to_owned(), dir.clone());
+    mut_dir.insert(".", dir.clone());
     match parent {
-      None => mut_dir.insert("..".to_owned(), dir.clone()),
-      Some(f) => mut_dir.insert("..".to_owned(), f)
+      None => mut_dir.insert("..", dir.clone()),
+      Some(f) => mut_dir.insert("..", f)
     }
 
     dir
@@ -66,7 +62,7 @@ impl File {
     DataFile(inode)
   }
 
-  pub fn get_dir_rc<'a>(&'a self) -> &'a RcDirContent {
+  pub fn get_dir_rc<'a>(&'a self) -> &'a RcDirContent<'r> {
     match self {
       &Directory(ref rc) => rc,
       _ => fail!("not a directory")
@@ -81,9 +77,9 @@ impl File {
   }
 }
 
-impl FileHandle {
+impl<'r> FileHandle<'r> {
   // Probably not the right type.
-  pub fn new(file: File) -> FileHandle {
+  pub fn new(file: File<'r>) -> FileHandle<'r> {
     FileHandle {
       file: file,
       seek: Cell::new(0)
