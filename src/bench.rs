@@ -1,4 +1,3 @@
-
 // #[cfg(test)]
 mod fs_benchmarks {
   extern crate test;
