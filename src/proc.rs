@@ -6,13 +6,14 @@ pub use file::Whence;
 use file::{File, EmptyFile, DataFile, Directory, FileHandle};
 use inode::Inode;
 use std::rc::Rc;
-use std::cell::{Cell, RefCell};
+use std::cell::{RefCell};
 use collections::HashMap;
 use directory::DirectoryHandle;
 
 mod directory;
 mod file;
 mod inode;
+mod bench;
 
 pub type FileDescriptor = int;
 
@@ -26,7 +27,7 @@ pub static O_CREAT: u32 =    (1 << 5);
 pub struct Proc<'r> {
   cwd: File<'r>,
   fd_table: HashMap<FileDescriptor, FileHandle<'r>>,
-  last_fd: Cell<int>
+  fds: Vec<FileDescriptor>
 }
 
 impl<'r> Proc<'r> {
@@ -34,14 +35,16 @@ impl<'r> Proc<'r> {
     Proc {
       cwd: File::new_dir(None),
       fd_table: HashMap::new(),
-      last_fd: Cell::new(2)
+      fds: Vec::from_fn(256 - 2, |i| { 256i - (i as int) })
     }
   }
-
-  fn get_fd(&self) -> FileDescriptor {
-    let fd = self.last_fd.get() + 1;
-    self.last_fd.set(fd);
-    fd
+  
+  #[inline(always)]
+  fn extract_fd(fd_opt: &Option<FileDescriptor>) -> FileDescriptor {
+    match fd_opt {
+      &Some(fd) => fd,
+      &None => fail!("Error in FD allocation.")
+    }
   }
 
   pub fn open(&mut self, path: &'r str, flags: u32) -> FileDescriptor {
@@ -63,7 +66,7 @@ impl<'r> Proc<'r> {
 
     match file {
       DataFile(_) => {
-        let fd = self.get_fd();
+        let fd = Proc::extract_fd(&self.fds.pop());
         let handle = FileHandle::new(file);
         self.fd_table.insert(fd, handle);
         fd
@@ -90,6 +93,7 @@ impl<'r> Proc<'r> {
 
   pub fn close(&mut self, fd: FileDescriptor) {
     self.fd_table.remove(&fd);
+    self.fds.push(fd);
   }
 
   pub fn unlink(&mut self, path: &'r str) {
