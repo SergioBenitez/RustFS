@@ -7,19 +7,26 @@ static PAGE_SIZE: uint = 4096;
 static LIST_SIZE: uint = 256;
 
 type Page = Box<([u8, ..PAGE_SIZE])>;
-type Entry = Option<Page>;
-type TList<T> = Box<([T, ..LIST_SIZE])>;
+type Entry = Page;
+type TList<T> = Box<([Option<T>, ..LIST_SIZE])>;
 type EntryList = TList<Entry>; // TODO: Option<TList> for lazy loading
-type DoubleEntryList = TList<Box<EntryList>>;
+type DoubleEntryList = TList<EntryList>;
 
 #[inline(always)]
 fn ceil_div(x: uint, y: uint) -> uint {
   return (x + y - 1) / y;
 }
 
+#[inline(always)]
+pub fn create_tlist<T>() -> TList<T> {
+  let mut list: TList<T> = box unsafe { mem::uninitialized() }; 
+  for x in list.mut_iter() { unsafe { mem::overwrite(x, None); } };
+  list
+}
+
 pub struct Inode {
   single: EntryList, // Box<([Option<Page>, ..256])>
-  // data2: DoubleEntryList,
+  double: DoubleEntryList, // Box<[Option<Box<([Option<Page>>, ..256])>, ..256]
   size: uint,
 
   mod_time: Timespec,
@@ -31,12 +38,9 @@ impl Inode {
   pub fn new() -> Inode {
     let time_now = time::get_time();
 
-    // Because Rust is a pain in the ass to work with
-    let mut entries: EntryList = box unsafe { mem::uninit() }; 
-    for x in entries.mut_iter() { unsafe { mem::move_val_init(x, None); } };
-
     Inode {
-      single: entries,
+      single: create_tlist(),
+      double: create_tlist(),
       size: 0,
 
       mod_time: time_now,
@@ -46,20 +50,56 @@ impl Inode {
   }
 
   fn get_or_alloc_page<'a>(&'a mut self, num: uint) -> &'a mut Page {
-    if num >= LIST_SIZE { fail!("Maximum file size exceeded!") };
+    if num >= LIST_SIZE + LIST_SIZE * LIST_SIZE {
+      fail!("Maximum file size exceeded!")
+    };
+  
+    // Getting a pointer to the page
+    let page = if num < LIST_SIZE {
+      // if the page num is in the singly-indirect list
+      &mut self.single[num]
+    } else {
+      // if the page num is in the doubly-indirect list. We allocate a new
+      // entry list where necessary (*entry_list = ...)
+      let doubleEntry = num - LIST_SIZE;
+      let slot = doubleEntry / LIST_SIZE;
+      let entry_list = &mut self.double[slot];
 
-    let page = &mut self.single[num];
+      match entry_list {
+        &None => *entry_list = Some(create_tlist()),
+        _ => { /* Do nothing */ }
+      }
+      
+      let entry_offset = doubleEntry % LIST_SIZE;
+      &mut entry_list.get_mut_ref()[entry_offset]
+    };
+
     match page {
-      &None => {
-        *page = Some(box () ([0u8, ..4096]));
-        page.get_mut_ref()
-      },
-      &Some(_) => page.get_mut_ref()
+      &None => *page = Some(box () ([0u8, ..4096])),
+      _ => { /* Do Nothing */ }
     }
+
+    page.get_mut_ref()
   }
 
   fn get_page<'a>(&'a self, num: uint) -> &'a Option<Page> {
-    &self.single[num]
+    if num >= LIST_SIZE + LIST_SIZE * LIST_SIZE {
+      fail!("Page does not exist.")
+    };
+
+    if num < LIST_SIZE {
+      &self.single[num]
+    } else {
+      let doubleEntry = num - LIST_SIZE;
+      let slot = doubleEntry / LIST_SIZE;
+      let entry_offset = doubleEntry % LIST_SIZE;
+      let entry_list = &self.double[slot];
+
+      match entry_list {
+        &None => fail!("Page does not exist."),
+        _ => &entry_list.get_ref()[entry_offset]
+      }
+    }
   }
 
   pub fn write(&mut self, offset: uint, data: &[u8]) -> uint {

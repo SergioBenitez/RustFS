@@ -1,11 +1,10 @@
-
-// #[cfg(test)]
+#[cfg(test)]
 mod fs_benchmarks {
   extern crate test;
 
   use self::test::Bencher;
   use super::super::{Proc, O_CREAT, O_RDWR, FileDescriptor};
-  use std::strbuf::StrBuf;
+  use std::string::String;
   use rand::random;
 
   static NUM: uint = 100;
@@ -42,7 +41,7 @@ mod fs_benchmarks {
     })
   }
 
-  fn generate_names(n: uint) -> Vec<StrBuf> {
+  fn generate_names(n: uint) -> Vec<String> {
     let name_length = ceil_div(n, 26);
     let mut name = Vec::from_fn(name_length, |_| '@' as u8);
 
@@ -50,7 +49,7 @@ mod fs_benchmarks {
       let next = name.get(i / 26) + 1;
       name.grow_set(i / 26, & ('@' as u8), next);
 
-      let string_result = StrBuf::from_utf8(name.clone());
+      let string_result = String::from_utf8(name.clone());
       match string_result {
         Ok(string) => string,
         Err(_) => fail!("Bad string!")
@@ -58,7 +57,7 @@ mod fs_benchmarks {
     })
   }
 
-  fn open_many<'a>(p: &mut Proc<'a>, names: &'a Vec<StrBuf>) -> Vec<FileDescriptor> {
+  fn open_many<'a>(p: &mut Proc<'a>, names: &'a Vec<String>) -> Vec<FileDescriptor> {
     Vec::from_fn(names.len(), |i| {
       let filename = names.get(i).as_slice();
       let fd = p.open(filename, O_CREAT | O_RDWR);
@@ -66,13 +65,13 @@ mod fs_benchmarks {
     })
   }
 
-  fn close_all(p: &mut Proc, fds: Vec<FileDescriptor>) {
+  fn close_all(p: &mut Proc, fds: &Vec<FileDescriptor>) {
     for fd in fds.iter() {
       p.close(*fd);
     }
   }
 
-  fn unlink_all<'a>(p: &mut Proc<'a>, names: &'a Vec<StrBuf>) {
+  fn unlink_all<'a>(p: &mut Proc<'a>, names: &'a Vec<String>) {
     for filename in names.iter() {
       p.unlink(filename.as_slice());
     }
@@ -90,7 +89,7 @@ mod fs_benchmarks {
   fn OtC(b: &mut Bencher) {
     bench!(|p, filenames| {
       let fds = open_many(&mut p, &filenames);
-      close_all(&mut p, fds);
+      close_all(&mut p, &fds);
     });
   }
 
@@ -105,7 +104,7 @@ mod fs_benchmarks {
   fn OtCtU(b: &mut Bencher) {
     bench!(|p, filenames| {
       let fds = open_many(&mut p, &filenames);
-      close_all(&mut p, fds);
+      close_all(&mut p, &fds);
       unlink_all(&mut p, &filenames);
     });
   }
@@ -160,87 +159,84 @@ mod fs_benchmarks {
     });
   }
 
-  // These benchmarks below require a larger maximum file size.
-  //
-  // #[bench]
-  // fn OWMsC(b: &mut Bencher) {
-  //   let size = 1024;
-  //   let many = 4096;
-  //   let content = rand_array(size);
-  //   bench_many!(|p, fd, filename| {
-  //     for i in range(0, many) {
-  //       p.write(fd, content.as_slice());
-  //     }
-  //     p.close(fd);
-  //   });
-  // }
+  #[bench]
+  fn OWMsC(b: &mut Bencher) {
+    let size = 1024;
+    let many = 4096;
+    let content = rand_array(size);
+    bench_many!(|p, fd, filename| {
+      for _ in range(0, many) {
+        p.write(fd, content.as_slice());
+      }
+      p.close(fd);
+    });
+  }
 
-  // #[bench]
-  // fn OWMsCU(b: &mut Bencher) {
-  //   let size = 1024;
-  //   let many = 4096;
-  //   let content = rand_array(size);
-  //   bench_many!(|p, fd, filename| {
-  //     for i in range(0, many) {
-  //       p.write(fd, content.as_slice());
-  //     }
-  //     p.close(fd);
-  //     p.unlink(filename);
-  //   });
-  // }
-  //
+  #[bench]
+  fn OWMsCU(b: &mut Bencher) {
+    let size = 1024;
+    let many = 4096;
+    let content = rand_array(size);
+    bench_many!(|p, fd, filename| {
+      for _ in range(0, many) {
+        p.write(fd, content.as_slice());
+      }
+      p.close(fd);
+      p.unlink(filename);
+    });
+  }
 
-  // #[bench]
-  // fn OWMbC(b: &mut Bencher) {
-  //   let size = 1048576;
-  //   let many = 32;
-  //   let content = rand_array(size);
-  //   bench_many!(|p, fd, filename| {
-  //     for i in range(0, many) {
-  //       p.write(fd, content.as_slice());
-  //     }
-  //     p.close(fd);
-  //   });
-  // }
+  #[bench]
+  fn OWMbC(b: &mut Bencher) {
+    let size = 1048576;
+    let many = 32;
+    let content = rand_array(size);
+    bench_many!(|p, fd, filename| {
+      for _ in range(0, many) {
+        p.write(fd, content.as_slice());
+      }
+      p.close(fd);
+    });
+  }
 
-  // #[bench]
-  // fn OWMbCU(b: &mut Bencher) {
-  //   let size = 1048576;
-  //   let many = 32;
-  //   let content = rand_array(size);
-  //   bench_many!(|p, fd, filename| {
-  //     for i in range(0, many) {
-  //       p.write(fd, content.as_slice());
-  //     }
-  //     p.close(fd);
-  //     p.unlink(filename);
-  //   });
-  // }
+  #[bench]
+  fn OWMbCU(b: &mut Bencher) {
+    let size = 1048576;
+    let many = 32;
+    let content = rand_array(size);
+    bench_many!(|p, fd, filename| {
+      for _ in range(0, many) {
+        p.write(fd, content.as_slice());
+      }
+      p.close(fd);
+      p.unlink(filename);
+    });
+  }
 
-  // #[bench]
-  // fn OWMbbC(b: &mut Bencher) {
-  //   let start_size = 2;
-  //   let many = 4096;
-  //   let content = rand_array(start_size * many);
-  //   bench_many!(|p, fd, filename| {
-  //     for i in range(1, many + 1) {
-  //       p.write(fd, content.slice(0, i * start_size));
-  //     }
-  //     p.close(fd);
-  //   });
-  // }
+  #[bench]
+  fn OWbbC(b: &mut Bencher) {
+    let start_size = 2;
+    let many = 4096;
+    let content = rand_array(start_size * many);
+    bench_many!(|p, fd, filename| {
+      for _ in range(1, many + 1) {
+        p.write(fd, content.slice(0, i * start_size));
+      }
+      p.close(fd);
+    });
+  }
 
-  // #[bench]
-  // fn OWMbCU(b: &mut Bencher) {
-  //   let start_size = 2;
-  //   let many = 4096;
-  //   let content = rand_array(start_size * many);
-  //   bench_many!(|p, fd, filename| {
-  //     for i in range(1, many + 1) {
-  //       p.write(fd, content.slice(0, i * start_size));
-  //     }
-  //     p.close(fd);
-  //     p.unlink(filename);
-  //   });
-  // }
+  #[bench]
+  fn OWbbCU(b: &mut Bencher) {
+    let start_size = 2;
+    let many = 4096;
+    let content = rand_array(start_size * many);
+    bench_many!(|p, fd, filename| {
+      for _ in range(1, many + 1) {
+        p.write(fd, content.slice(0, i * start_size));
+      }
+      p.close(fd);
+      p.unlink(filename);
+    });
+  }
 }
