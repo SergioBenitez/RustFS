@@ -1,3 +1,5 @@
+#![feature(macro_rules)]
+
 extern crate rand;
 extern crate time;
 extern crate collections;

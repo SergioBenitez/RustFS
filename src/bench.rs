@@ -1,3 +1,4 @@
+
 // #[cfg(test)]
 mod fs_benchmarks {
   extern crate test;
@@ -7,6 +8,28 @@ mod fs_benchmarks {
   use std::strbuf::StrBuf;
 
   static NUM: uint = 100;
+
+  macro_rules! bench(
+    (|$p:ident, $filenames:ident| $task:stmt) => ({
+      let mut $p = Proc::new();
+      let $filenames = generate_names(NUM);
+      b.iter(|| { $task });
+    });
+  )
+
+  macro_rules! bench_many(
+    (|$p:ident, $fd:ident, $filename:ident| $op:stmt) => ({
+      let mut $p = Proc::new();
+      let filenames = generate_names(NUM);
+      b.iter(|| { 
+        for i in range(0, NUM) {
+          let $filename = filenames.get(i).as_slice();
+          let $fd = $p.open($filename, O_CREAT | O_RDWR);
+          $op
+        }
+      });
+    });
+  )
 
   fn ceil_div(x: uint, y: uint) -> uint {
     return (x + y - 1) / y;
@@ -28,18 +51,12 @@ mod fs_benchmarks {
     })
   }
 
-  fn open_many_c<'a>(p: &mut Proc<'a>, names: &'a Vec<StrBuf>, 
-  op: |FileDescriptor, &'a str|) -> Vec<FileDescriptor> {
+  fn open_many<'a>(p: &mut Proc<'a>, names: &'a Vec<StrBuf>) -> Vec<FileDescriptor> {
     Vec::from_fn(names.len(), |i| {
       let filename = names.get(i).as_slice();
       let fd = p.open(filename, O_CREAT | O_RDWR);
-      op(fd, filename);
       fd
     })
-  }
-
-  fn open_many<'a>(p: &mut Proc<'a>, names: &'a Vec<StrBuf>) -> Vec<FileDescriptor> {
-    open_many_c(p, names, |_, _|{ })
   }
 
   fn close_all(p: &mut Proc, fds: Vec<FileDescriptor>) {
@@ -48,32 +65,15 @@ mod fs_benchmarks {
     }
   }
 
-  /**
-   * Write a two macros to make this easier:
-   *
-   * bench!({
-   *   with_many!(|fd, name| {
-   *     p.close(fd);
-   *   });
-   * });
-   *
-   * bench! =>
-   *   let mut p = Proc::new();
-   *   let filesnames = generate_names(NUM);
-   *   b.iter(|| user_text);
-   *
-   * with_many! =>
-   *   for i in range(0, NUM) {
-   *     let filename = filesnames.get(i).as_slice();
-   *     let fd = p.open(filename, O_CREAT | O_RDWR);
-   *     user test with fd, name replacement
-   *   }
-   */
+  fn unlink_all<'a>(p: &mut Proc<'a>, names: &'a Vec<StrBuf>) {
+    for filename in names.iter() {
+      p.unlink(filename.as_slice());
+    }
+  }
 
   #[bench]
   fn OC1(b: &mut Bencher) {
-    let mut p = Proc::new(); 
-    b.iter(|| {
+    bench!(|p, _names| {
       let fd = p.open("test", O_CREAT);
       p.close(fd);
     });
@@ -81,24 +81,33 @@ mod fs_benchmarks {
 
   #[bench]
   fn OtC(b: &mut Bencher) {
-    let mut p = Proc::new(); 
-    let filesnames = generate_names(NUM);
-    b.iter(|| {
-      let fds = open_many(&mut p, &filesnames);
+    bench!(|p, filenames| {
+      let fds = open_many(&mut p, &filenames);
       close_all(&mut p, fds);
     });
   }
 
   #[bench]
   fn OC(b: &mut Bencher) {
-    let mut p = Proc::new(); 
-    let filesnames = generate_names(NUM);
-    b.iter(|| {
-      for i in range(0, NUM) {
-        let filename = filesnames.get(i).as_slice();
-        let fd = p.open(filename, O_CREAT | O_RDWR);
-        p.close(fd);
-      }
+    bench_many!(|p, fd, filename| {
+      p.close(fd);
+    });
+  }
+
+  #[bench]
+  fn OtCtU(b: &mut Bencher) {
+    bench!(|p, filenames| {
+      let fds = open_many(&mut p, &filenames);
+      close_all(&mut p, fds);
+      unlink_all(&mut p, &filenames);
+    });
+  }
+
+  #[bench]
+  fn OCU(b: &mut Bencher) {
+    bench_many!(|p, fd, filename| {
+      p.close(fd);
+      p.unlink(filename);
     });
   }
 }
