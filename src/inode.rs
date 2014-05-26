@@ -1,7 +1,7 @@
 use time;
 use time::Timespec;
 use std::mem;
-use std::slice::MutableCloneableVector;
+// use std::slice::MutableCloneableVector;
 
 static PAGE_SIZE: uint = 4096;
 static LIST_SIZE: uint = 256;
@@ -84,7 +84,12 @@ impl Inode {
       // Finding our block, writing to it
       let page = self.get_or_alloc_page(start + i);
       let slice = page.mut_slice(block_offset, block_offset + num_bytes);
-      written += slice.copy_from(data.slice(written, written + num_bytes));
+      // written += slice.copy_from(data.slice(written, written + num_bytes));
+      unsafe { 
+        // copy_from is extremely slow! use copy_memory instead
+        slice.copy_memory(data.slice(written, written + num_bytes));
+        written += num_bytes;
+      }
     }
 
     let last_byte = offset + written;
@@ -118,7 +123,13 @@ impl Inode {
       };
 
       let slice = data.mut_slice(read, read + num_bytes);
-      read += slice.copy_from(page.slice(block_offset, block_offset + num_bytes));
+      // read += slice.copy_from(page.slice(block_offset,
+      // block_offset + num_bytes));
+      unsafe { 
+        // copy_from is extremely slow! use copy_memory instead
+        slice.copy_memory(page.slice(block_offset, block_offset + num_bytes));
+        read += num_bytes;
+      }
     }
 
     read

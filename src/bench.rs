@@ -6,6 +6,7 @@ mod fs_benchmarks {
   use self::test::Bencher;
   use super::super::{Proc, O_CREAT, O_RDWR, FileDescriptor};
   use std::strbuf::StrBuf;
+  use rand::random;
 
   static NUM: uint = 100;
 
@@ -33,6 +34,12 @@ mod fs_benchmarks {
 
   fn ceil_div(x: uint, y: uint) -> uint {
     return (x + y - 1) / y;
+  }
+
+  fn rand_array(size: uint) -> Vec<u8> {
+    Vec::from_fn(size, |_| {
+      random::<u8>()
+    })
   }
 
   fn generate_names(n: uint) -> Vec<StrBuf> {
@@ -110,4 +117,130 @@ mod fs_benchmarks {
       p.unlink(filename);
     });
   }
+
+  #[bench]
+  fn OWsC(b: &mut Bencher) {
+    let size = 1024;
+    let content = rand_array(size);
+    bench_many!(|p, fd, filename| {
+      p.write(fd, content.as_slice());
+      p.close(fd);
+    });
+  }
+
+  #[bench]
+  fn OWsCU(b: &mut Bencher) {
+    let size = 1024;
+    let content = rand_array(size);
+    bench_many!(|p, fd, filename| {
+      p.write(fd, content.as_slice());
+      p.close(fd);
+      p.unlink(filename);
+    });
+  }
+
+  #[bench]
+  fn OWbC(b: &mut Bencher) {
+    let size = 40960;
+    let content = rand_array(size);
+    bench_many!(|p, fd, filename| {
+      p.write(fd, content.as_slice());
+      p.close(fd);
+    });
+  }
+
+  #[bench]
+  fn OWbCU(b: &mut Bencher) {
+    let size = 40960;
+    let content = rand_array(size);
+    bench_many!(|p, fd, filename| {
+      p.write(fd, content.as_slice());
+      p.close(fd);
+      p.unlink(filename);
+    });
+  }
+
+  // These benchmarks below require a larger maximum file size.
+  //
+  // #[bench]
+  // fn OWMsC(b: &mut Bencher) {
+  //   let size = 1024;
+  //   let many = 4096;
+  //   let content = rand_array(size);
+  //   bench_many!(|p, fd, filename| {
+  //     for i in range(0, many) {
+  //       p.write(fd, content.as_slice());
+  //     }
+  //     p.close(fd);
+  //   });
+  // }
+
+  // #[bench]
+  // fn OWMsCU(b: &mut Bencher) {
+  //   let size = 1024;
+  //   let many = 4096;
+  //   let content = rand_array(size);
+  //   bench_many!(|p, fd, filename| {
+  //     for i in range(0, many) {
+  //       p.write(fd, content.as_slice());
+  //     }
+  //     p.close(fd);
+  //     p.unlink(filename);
+  //   });
+  // }
+  //
+
+  // #[bench]
+  // fn OWMbC(b: &mut Bencher) {
+  //   let size = 1048576;
+  //   let many = 32;
+  //   let content = rand_array(size);
+  //   bench_many!(|p, fd, filename| {
+  //     for i in range(0, many) {
+  //       p.write(fd, content.as_slice());
+  //     }
+  //     p.close(fd);
+  //   });
+  // }
+
+  // #[bench]
+  // fn OWMbCU(b: &mut Bencher) {
+  //   let size = 1048576;
+  //   let many = 32;
+  //   let content = rand_array(size);
+  //   bench_many!(|p, fd, filename| {
+  //     for i in range(0, many) {
+  //       p.write(fd, content.as_slice());
+  //     }
+  //     p.close(fd);
+  //     p.unlink(filename);
+  //   });
+  // }
+
+  // #[bench]
+  // fn OWMbbC(b: &mut Bencher) {
+  //   let start_size = 2;
+  //   let many = 4096;
+  //   let content = rand_array(start_size * many);
+  //   bench_many!(|p, fd, filename| {
+  //     for i in range(1, many + 1) {
+  //       p.write(fd, content.slice(0, i * start_size));
+  //     }
+  //     p.close(fd);
+  //   });
+  // }
+
+  // #[bench]
+  // fn OWMbCU(b: &mut Bencher) {
+  //   let start_size = 2;
+  //   let many = 4096;
+  //   let content = rand_array(start_size * many);
+  //   bench_many!(|p, fd, filename| {
+  //     for i in range(1, many + 1) {
+  //       p.write(fd, content.slice(0, i * start_size));
+  //     }
+  //     p.close(fd);
+  //     p.unlink(filename);
+  //   });
+  // }
 }
