@@ -151,7 +151,7 @@ impl<T> SlabAllocator<T> {
     }
 
     let ptr: *mut T = *self.items.get(alloc);
-    unsafe { mem::move_val_init(&mut *ptr, value); }
+    unsafe { mem::overwrite(&mut *ptr, value); }
 
     self.alloc.set(alloc + 1);
     let slab = Slab { parent: self, ptr: ptr }; 

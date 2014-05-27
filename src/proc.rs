@@ -1,4 +1,5 @@
-#![feature(macro_rules)]
+#![crate_type = "lib"]
+#![crate_id = "rustfs"]
 
 extern crate rand;
 extern crate time;
@@ -15,7 +16,6 @@ use directory::DirectoryHandle;
 mod directory;
 mod file;
 mod inode;
-mod bench;
 
 pub type FileDescriptor = int;
 
@@ -277,51 +277,3 @@ mod proc_tests {
     p.write(fd, data.as_slice());
   }
 }
-
-// Used to make sure bencher is/isn't broken.
-// fn ceil_div(x: uint, y: uint) -> uint {
-//   return (x + y - 1) / y;
-// }
-
-// fn rand_array(size: uint) -> Vec<u8> {
-//   use rand::random;
-//   Vec::from_fn(size, |_| {
-//     random::<u8>()
-//   })
-// }
-
-// fn generate_names(n: uint) -> Vec<StrBuf> {
-//   let name_length = ceil_div(n, 26);
-//   let mut name = Vec::from_fn(name_length, |_| '@' as u8);
-
-//   Vec::from_fn(n, |i| {
-//     let next = name.get(i / 26) + 1;
-//     name.grow_set(i / 26, & ('@' as u8), next);
-
-//     let string_result = StrBuf::from_utf8(name.clone());
-//     match string_result {
-//       Ok(string) => string,
-//       Err(_) => fail!("Bad string!")
-//     }
-//   })
-// }
-
-// fn main() {
-//   static NUM: uint = 100;
-//   let mut p = Proc::new();
-//   let filenames = generate_names(NUM);
-
-//   for i in range(0, NUM) {
-//     let filename = filenames.get(i).as_slice();
-//     let fd = p.open(filename, O_CREAT | O_RDWR);
-//     let size = 1024;
-//     let many = 4096;
-//     let content = rand_array(size);
-
-//     for _ in range(0, many) {
-//       p.write(fd, content.as_slice());
-//     }
-
-//     p.close(fd);
-//   }
-// }
