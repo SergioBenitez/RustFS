@@ -21,7 +21,7 @@ Finally, use `Proc::new()` to create a new `Proc`. Call `open` / `close` / `seek
 
 	let mut p = Proc::new();
 	
-	# Let's writing `data` to a new file named "file".
+	# Let's write `data` to a new file named "file".
 	let data = ... some data ...;
     let fd = p.open("file", O_CREAT | O_RDWR);
     p.write(fd, data);
