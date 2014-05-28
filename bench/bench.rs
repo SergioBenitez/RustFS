@@ -13,9 +13,9 @@ static NUM: uint = 100;
 
 macro_rules! bench(
   ($wrap:ident, $name:ident, $time:expr, |$p:ident, $filenames:ident| $task:stmt) => ({
+    let $filenames = generate_names(NUM);
     let $wrap = |b: &mut Benchmarker| {
       let mut $p = Proc::new();
-      let $filenames = generate_names(NUM);
       b.run(|| {
         $task
       });
@@ -26,9 +26,9 @@ macro_rules! bench(
 
 macro_rules! bench_many(
   ($wrap:ident, $name:ident, $time:expr, |$p:ident, $fd:ident, $filename:ident| $op:stmt) => ({
+    let filenames = generate_names(NUM);
     let $wrap = |b: &mut Benchmarker| {
       let mut $p = Proc::new();
-      let filenames = generate_names(NUM);
       b.run(|| {
         for i_j in range(0, NUM) {
           let $filename = filenames.get(i_j).as_slice();

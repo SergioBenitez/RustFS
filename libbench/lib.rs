@@ -32,6 +32,8 @@ impl Benchmarker {
   }
 
   pub fn run(&mut self, f: ||) -> BenchTimeNS {
+    println!("Running for {} iterations.", self.iterations);
+
     self.ns_start = precise_time_ns();
     for _ in range(0u64, self.iterations) {
       black_box(f());
@@ -48,6 +50,11 @@ impl Benchmarker {
     }
   }
 
+  pub fn bench_n(&mut self, n: u64, f: |&mut Benchmarker|) {
+    self.iterations = n;
+    f(self); // f will call b.run internally
+  }
+
   pub fn bench(&mut self, f: |&mut Benchmarker|, min_time: u64) -> BenchResults {
     // min_time is in ms, convert to ns. start with 1 iteration
     let min_time = min_time * 1_000_000;
@@ -56,8 +63,7 @@ impl Benchmarker {
     // Keep trying to get enough iterations so as take `min_time`
     loop {
       // run for n iterations
-      self.iterations = n;
-      f(self); // Calls b.run() internally
+      self.bench_n(n, |x| f(x));
 
       // If we've done enough, we're done
       let elapsed = self.ns_end - self.ns_start;
