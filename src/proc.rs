@@ -114,6 +114,19 @@ mod proc_tests {
 
   static mut test_inode_drop: bool = false;
 
+  impl Drop for Inode {
+    fn drop(&mut self) {
+      unsafe {
+        if test_inode_drop {
+          test_inode_drop = false;
+          fail!("Dropping.");
+        } else {
+          println!("Dropping, but no flag.");
+        }
+      }
+    }
+  }
+
   fn rand_array(size: uint) -> Vec<u8> {
     Vec::from_fn(size, |_| {
       random::<u8>()
@@ -165,6 +178,21 @@ mod proc_tests {
     assert_eq!(fd4, -2);
   }
 
+  #[test]
+  #[should_fail]
+  fn test_proc_drop_inode_dealloc() {
+    // Variable is used to make sure that the Drop implemented is only valid for
+    // tests that set that test_inode_drop global variable to true.
+    unsafe { test_inode_drop = true; }
+
+    static size: uint = 4096 * 3 + 3498;
+    let mut p = Proc::new();
+    let data = rand_array(size);
+
+    let fd = p.open("file", O_RDWR | O_CREAT);
+    p.write(fd, data.as_slice());
+  }
+
   /**
    * This function makes sure that on unlink, the inode's data structure is
    * indeed dropped. This means that a few things have gone right:
@@ -178,22 +206,10 @@ mod proc_tests {
   #[test]
   #[should_fail]
   fn test_inode_dealloc() {
-    // Variable is used to make sure that the Drop implemented is only valid for
-    // tests that set that test_inode_drop global variable to true.
+    // Make sure flag is set to detect drop.
     unsafe { test_inode_drop = true; }
 
-    impl Drop for Inode {
-      fn drop(&mut self) {
-        unsafe { 
-          if test_inode_drop {
-            test_inode_drop = false;
-            fail!("Dropping.");
-          }
-        }
-      }
-    }
-
-    static size: uint = 4096;
+    static size: uint = 4096 * 3 + 3498;
     let mut p = Proc::new();
     let data = rand_array(size);
     let mut buf = [0u8, ..size];
@@ -206,6 +222,8 @@ mod proc_tests {
 
     assert_eq_buf(data.as_slice(), buf);
 
+    // close + unlink should remove both references to inode, dropping it,
+    // causing a failure
     p.close(fd);
     p.unlink(filename);
     
