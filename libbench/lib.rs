@@ -13,8 +13,8 @@ pub struct Benchmarker {
   ns_end: u64,
 }
 
-type IterationCount = u64;
-type BenchTimeNS = u64;
+pub type IterationCount = u64;
+pub type BenchTimeNS = u64;
 pub type BenchResults = (IterationCount, BenchTimeNS);
 
 fn black_box<T>(dummy: T) {
@@ -31,10 +31,9 @@ impl Benchmarker {
     }
   }
 
-  fn run(&mut self, iter: IterationCount, f: ||) -> BenchTimeNS {
+  pub fn run(&mut self, f: ||) -> BenchTimeNS {
     self.ns_start = precise_time_ns();
-    self.iterations = iter;
-    for _ in range(0u64, iter) {
+    for _ in range(0u64, self.iterations) {
       black_box(f());
     }
     self.ns_end = precise_time_ns();
@@ -49,7 +48,7 @@ impl Benchmarker {
     }
   }
 
-  pub fn bench(&mut self, f: ||, min_time: u64) -> BenchResults {
+  pub fn bench(&mut self, f: |&mut Benchmarker|, min_time: u64) -> BenchResults {
     // min_time is in ms, convert to ns. start with 1 iteration
     let min_time = min_time * 1_000_000;
     let mut n: u64 = 1;
@@ -57,9 +56,12 @@ impl Benchmarker {
     // Keep trying to get enough iterations so as take `min_time`
     loop {
       // run for n iterations
-      let elapsed = self.run(n, || f());
+      self.iterations = n;
+      f(self); // Calls b.run() internally
 
       // If we've done enough, we're done
+      let elapsed = self.ns_end - self.ns_start;
+      if elapsed == 0 { fail!("Must call run in benchmark function."); }
       if elapsed >= min_time { break }
 
       // Otherwise, adjust the number of iterations and try again
@@ -77,7 +79,7 @@ impl Benchmarker {
 }
 
 // Benchmark `f` for at least `time` ms
-pub fn benchmark(name: &str, f: ||, time: u64) -> BenchResults {
+pub fn benchmark(name: &str, f: |&mut Benchmarker|, time: u64) -> BenchResults {
   let mut bench = Benchmarker::new();
   let results = bench.bench(f, time);
   bench.print_results(name, results);
