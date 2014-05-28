@@ -42,11 +42,7 @@ impl Benchmarker {
   }
 
   fn ns_per_iter(&self) -> BenchTimeNS {
-    if self.iterations == 0 {
-      0
-    } else {
-      (self.ns_end - self.ns_start) / self.iterations
-    }
+    (self.ns_end - self.ns_start) / self.iterations
   }
 
   pub fn bench_n(&mut self, n: u64, f: |&mut Benchmarker|) {
