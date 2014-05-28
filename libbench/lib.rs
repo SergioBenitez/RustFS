@@ -32,8 +32,6 @@ impl Benchmarker {
   }
 
   pub fn run(&mut self, f: ||) -> BenchTimeNS {
-    println!("Running for {} iterations.", self.iterations);
-
     self.ns_start = precise_time_ns();
     for _ in range(0u64, self.iterations) {
       black_box(f());
