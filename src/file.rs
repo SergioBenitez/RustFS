@@ -38,7 +38,7 @@ pub enum Whence {
 }
 
 impl<'r> File<'r> {
-  pub fn new_dir(parent: Option<File<'r>>) -> File<'r> {
+  pub fn new_dir(_parent: Option<File<'r>>) -> File<'r> {
     let content = box DirectoryContent { entries: HashMap::new() };
     let rc = Rc::new(RefCell::new(content));
     let dir = Directory(rc);
@@ -46,14 +46,14 @@ impl<'r> File<'r> {
     // Note that dir is RCd, so this is cheap
     // Used to borrow dir and mut_dir at "same time"
     // RefCell makes sure we're not doing anything wrong
-    let mut mut_dir = dir.clone();
+    // let mut mut_dir = dir.clone();
 
-    // Setting up "." and ".."
-    mut_dir.insert(".", dir.clone());
-    match parent {
-      None => mut_dir.insert("..", dir.clone()),
-      Some(f) => mut_dir.insert("..", f)
-    }
+    // // Setting up "." and ".."
+    // mut_dir.insert(".", dir.clone());
+    // match parent {
+    //   None => mut_dir.insert("..", dir.clone()),
+    //   Some(f) => mut_dir.insert("..", f)
+    // }
 
     dir
   }

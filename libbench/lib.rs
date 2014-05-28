@@ -13,8 +13,8 @@ pub struct Benchmarker {
   ns_end: u64,
 }
 
-type IterationCount = u64;
-type BenchTimeNS = u64;
+pub type IterationCount = u64;
+pub type BenchTimeNS = u64;
 pub type BenchResults = (IterationCount, BenchTimeNS);
 
 fn black_box<T>(dummy: T) {
@@ -31,10 +31,10 @@ impl Benchmarker {
     }
   }
 
-  fn run(&mut self, iter: IterationCount, f: ||) -> BenchTimeNS {
+  pub fn run(&mut self, f: ||) -> BenchTimeNS {
+    let k = self.iterations;
     self.ns_start = precise_time_ns();
-    self.iterations = iter;
-    for _ in range(0u64, iter) {
+    for _ in range(0, k) {
       black_box(f());
     }
     self.ns_end = precise_time_ns();
@@ -42,14 +42,15 @@ impl Benchmarker {
   }
 
   fn ns_per_iter(&self) -> BenchTimeNS {
-    if self.iterations == 0 {
-      0
-    } else {
-      (self.ns_end - self.ns_start) / self.iterations
-    }
+    (self.ns_end - self.ns_start) / self.iterations
   }
 
-  pub fn bench(&mut self, f: ||, min_time: u64) -> BenchResults {
+  pub fn bench_n(&mut self, n: u64, f: |&mut Benchmarker|) {
+    self.iterations = n;
+    f(self); // f will call b.run internally
+  }
+
+  pub fn bench(&mut self, f: |&mut Benchmarker|, min_time: u64) -> BenchResults {
     // min_time is in ms, convert to ns. start with 1 iteration
     let min_time = min_time * 1_000_000;
     let mut n: u64 = 1;
@@ -57,9 +58,11 @@ impl Benchmarker {
     // Keep trying to get enough iterations so as take `min_time`
     loop {
       // run for n iterations
-      let elapsed = self.run(n, || f());
+      self.bench_n(n, |x| f(x));
 
       // If we've done enough, we're done
+      let elapsed = self.ns_end - self.ns_start;
+      if elapsed == 0 { fail!("Must call run in benchmark function."); }
       if elapsed >= min_time { break }
 
       // Otherwise, adjust the number of iterations and try again
@@ -77,7 +80,7 @@ impl Benchmarker {
 }
 
 // Benchmark `f` for at least `time` ms
-pub fn benchmark(name: &str, f: ||, time: u64) -> BenchResults {
+pub fn benchmark(name: &str, f: |&mut Benchmarker|, time: u64) -> BenchResults {
   let mut bench = Benchmarker::new();
   let results = bench.bench(f, time);
   bench.print_results(name, results);

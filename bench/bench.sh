@@ -1,4 +1,4 @@
-rm libbench* 2> /dev/null
+rm lib* 2> /dev/null
 rm *.o 2> /dev/null
 
 echo "Compling Benchmarking Tool..."
