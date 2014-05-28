@@ -8,14 +8,14 @@ use inode::{Inode};
 use directory::DirectoryHandle;
 
 type RcDirContent<'r> = Rc<RefCell<Box<DirectoryContent<'r>>>>;
-type RcInode = Rc<RefCell<Box<Inode>>>;
+type RcInode<'r> = Rc<RefCell<Box<Inode<'r>>>>;
 
 // File is a thing wrapper around Inodes and Directories. The whole point is to
 // provide a layer of indirection. FileHandle's and Directory entries, then,
 // point to these guys instead of directly to Inodes/Directories
 #[deriving(Clone)]
 pub enum File<'r> {
-  DataFile(RcInode),
+  DataFile(RcInode<'r>),
   Directory(RcDirContent<'r>),
   EmptyFile
 }
@@ -58,7 +58,7 @@ impl<'r> File<'r> {
     dir
   }
 
-  pub fn new_data_file(inode: RcInode) -> File {
+  pub fn new_data_file(inode: RcInode<'r>) -> File<'r> {
     DataFile(inode)
   }
 
@@ -69,7 +69,7 @@ impl<'r> File<'r> {
     }
   }
 
-  pub fn get_inode_rc<'a>(&'a self) -> &'a RcInode {
+  pub fn get_inode_rc<'a>(&'a self) -> &'a RcInode<'r> {
     match self {
       &DataFile(ref rc) => rc,
       _ => fail!("not a directory")

@@ -1,5 +1,6 @@
 #![allow(raw_pointer_deriving)]
 #![crate_type = "lib"]
+#![crate_id = "slab"]
 
 /**
  * A growing (not yet shrinking), typed slab allocator.
@@ -119,6 +120,8 @@ impl<T> SlabAllocator<T> {
   // pre-allocates and additional new_items and adds them to the end of
   // self.items, increasing self.capacity with the new size
   fn expand(&mut self, new_items: uint) {
+    println!("Expanding by {}: {} bytes", new_items, mem::size_of::<T>() * new_items);
+
     unsafe {
       let memory = malloc((mem::size_of::<T>() * new_items) as size_t) as *mut T;
       assert!(!memory.is_null());
@@ -131,6 +134,17 @@ impl<T> SlabAllocator<T> {
     self.capacity.set(self.capacity.get() + new_items);
   }
 
+  pub fn dirty_alloc<'r>(&'r self) -> SlabBox<'r, T> {
+    // print!(".");
+    self.all_alloc(None)
+  }
+
+
+  pub fn alloc<'r>(&'r self, value: T) -> SlabBox<'r, T> {
+    // print!("*");
+    self.all_alloc(Some(value))
+  }
+
   /**
    * TODO: Have a way to return possibly dirty objects.
    *
@@ -140,7 +154,7 @@ impl<T> SlabAllocator<T> {
    * Alternatively, have an alloc_dirty that always returns possibly dirty
    * values.
    */
-  pub fn alloc<'r>(&'r self, value: T) -> SlabBox<'r, T> {
+  fn all_alloc<'r>(&'r self, value: Option<T>) -> SlabBox<'r, T> {
     let (alloc, capacity) = (self.alloc.get(), self.capacity.get());
     if alloc >= capacity {
       unsafe {
@@ -151,7 +165,10 @@ impl<T> SlabAllocator<T> {
     }
 
     let ptr: *mut T = *self.items.get(alloc);
-    unsafe { mem::overwrite(&mut *ptr, value); }
+    match value {
+      Some(val) => unsafe { mem::overwrite(&mut *ptr, val); },
+      None => { /* Giving back dirty value. */ }
+    }
 
     self.alloc.set(alloc + 1);
     let slab = Slab { parent: self, ptr: ptr }; 
@@ -159,6 +176,8 @@ impl<T> SlabAllocator<T> {
   }
 
   fn free(&self, ptr: *mut T) {
+    print!("-");
+
     let alloc = self.alloc.get();
     if alloc <= 0 { fail!("Over-freeing....somehow"); }
 
@@ -529,5 +548,48 @@ mod tests {
 
     let (alloc, _) = thing.allocator.stats();
     assert_eq!(alloc, 2);
+  }
+
+  #[test]
+  fn test_dirty_alloc() {
+    struct ValHolder {
+      value: int,
+      value2: int
+    }
+
+    let slab_allocator = SlabAllocator::new(20);
+
+    // Allocating an object in a different scope so it's returned at end
+    {
+      let struct_obj = ValHolder { value: 3490, value2: 871 };
+      let object = slab_allocator.alloc(struct_obj);
+      assert_eq!(object.value, 3490);
+      assert_eq!(object.value2, 871);
+    }
+
+    // Making sure object is returned back.
+    let (alloc, _) = slab_allocator.stats();
+    assert_eq!(0, alloc);
+
+    // Making sure dirty_alloc returns the same structure.
+    {
+      let object = slab_allocator.dirty_alloc();
+      assert_eq!(object.value, 3490);
+      assert_eq!(object.value2, 871);
+    }
+
+    // Again, should be deallocated.
+    let (alloc, _) = slab_allocator.stats();
+    assert_eq!(0, alloc);
+
+    // Allocating two objects. First should be dirty with same values, second
+    // shouldn't have the same values.
+    let object1 = slab_allocator.dirty_alloc();
+    let object2 = slab_allocator.dirty_alloc();
+
+    assert_eq!(object1.value, 3490);
+    assert_eq!(object1.value2, 871);
+    assert!(object2.value != 3490);
+    assert!(object2.value2 != 871);
   }
 }

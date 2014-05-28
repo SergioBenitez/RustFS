@@ -1,16 +1,17 @@
 use time;
 use time::Timespec;
 use std::mem;
-// use std::slice::MutableCloneableVector;
+use slab::{SlabAllocator, SlabBox};
 
 static PAGE_SIZE: uint = 4096;
 static LIST_SIZE: uint = 256;
 
-type Page = Box<([u8, ..PAGE_SIZE])>;
-type Entry = Page;
+pub type RawPage = [u8, ..PAGE_SIZE];
+type Page<'a> = SlabBox<'a, RawPage>;
+type Entry<'a> = Page<'a>;
 type TList<T> = Box<([Option<T>, ..LIST_SIZE])>;
-type EntryList = TList<Entry>; // TODO: Option<TList> for lazy loading
-type DoubleEntryList = TList<EntryList>;
+type EntryList<'a> = TList<Entry<'a>>; // TODO: Option<TList> for lazy loading
+type DoubleEntryList<'a> = TList<EntryList<'a>>;
 
 #[inline(always)]
 fn ceil_div(x: uint, y: uint) -> uint {
@@ -24,18 +25,20 @@ pub fn create_tlist<T>() -> TList<T> {
   list
 }
 
-pub struct Inode {
-  single: EntryList, // Box<([Option<Page>, ..256])>
-  double: DoubleEntryList, // Box<[Option<Box<([Option<Page>>, ..256])>, ..256]
+pub struct Inode<'r> {
+  single: EntryList<'r>, // Box<[Option<SlabBox<RawPage>>, ..256]>
+  double: DoubleEntryList<'r>, // Box<[Option<EntryList>, ..256]>
   size: uint,
 
   mod_time: Timespec,
   access_time: Timespec,
   create_time: Timespec,
+
+  page_allocator: &'r SlabAllocator<RawPage>
 }
 
-impl Inode {
-  pub fn new() -> Inode {
+impl<'r> Inode<'r> {
+  pub fn new(page_allocator: &'r SlabAllocator<RawPage>) -> Inode<'r> {
     let time_now = time::get_time();
 
     Inode {
@@ -45,11 +48,13 @@ impl Inode {
 
       mod_time: time_now,
       access_time: time_now,
-      create_time: time_now
+      create_time: time_now,
+
+      page_allocator: page_allocator,
     }
   }
 
-  fn get_or_alloc_page<'a>(&'a mut self, num: uint) -> &'a mut Page {
+  fn get_or_alloc_page<'a>(&'a mut self, num: uint) -> &'a mut Page<'r> {
     if num >= LIST_SIZE + LIST_SIZE * LIST_SIZE {
       fail!("Maximum file size exceeded!")
     };
@@ -75,14 +80,15 @@ impl Inode {
     };
 
     match page {
-      &None => *page = Some(box () ([0u8, ..4096])),
+      // &None => *page = Some(box () ([0u8, ..4096])),
+      &None => *page = Some(self.page_allocator.dirty_alloc()),
       _ => { /* Do Nothing */ }
     }
 
     page.get_mut_ref()
   }
 
-  fn get_page<'a>(&'a self, num: uint) -> &'a Option<Page> {
+  fn get_page<'a>(&'a self, num: uint) -> &'a Option<Page<'r>> {
     if num >= LIST_SIZE + LIST_SIZE * LIST_SIZE {
       fail!("Page does not exist.")
     };
@@ -105,7 +111,6 @@ impl Inode {
   pub fn write(&mut self, offset: uint, data: &[u8]) -> uint {
     let mut written = 0;
     let mut block_offset = offset % PAGE_SIZE; // offset from first block
-
     let start = offset / PAGE_SIZE; // first block to act on
     let blocks_to_act_on = ceil_div(block_offset + data.len(), PAGE_SIZE);
 
@@ -183,8 +188,10 @@ impl Inode {
 #[cfg(test)]
 mod tests {
   extern crate rand;
+  extern crate slab;
 
   use super::{Inode};
+  use slab::SlabAllocator;
   use rand::random;
   
   fn rand_array(size: uint) -> Vec<u8> {
@@ -198,7 +205,8 @@ mod tests {
     static size: uint = 4096 * 8 + 3434;
 
     let original_data = rand_array(size);
-    let mut inode = Inode::new();
+    let page_allocator = SlabAllocator::new(10);
+    let mut inode = Inode::new(&page_allocator);
     let mut buf = [0u8, ..size];
 
     // Write the random data, read it back into buffer
