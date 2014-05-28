@@ -146,7 +146,7 @@ fn main() {
 
   let (size, many) = (1024, 4096);
   let content = rand_array(size);
-  bench_many!(bench_OWMsC, OWMsC, 2000, |p, fd, filename| {
+  bench_many!(bench_OWMsC, OWMsC, 3000, |p, fd, filename| {
     for _ in range(0, many) {
       p.write(fd, content.as_slice());
     }
@@ -155,7 +155,7 @@ fn main() {
 
   let (size, many) = (1024, 4096);
   let content = rand_array(size);
-  bench_many!(bench_OWMsCU, OWMsCU, 3000, |p, fd, filename| {
+  bench_many!(bench_OWMsCU, OWMsCU, 5000, |p, fd, filename| {
     for _ in range(0, many) {
       p.write(fd, content.as_slice());
     }
