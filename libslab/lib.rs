@@ -135,24 +135,14 @@ impl<T> SlabAllocator<T> {
     self.capacity.set(self.capacity.get() + new_items);
   }
 
-  pub fn dirty_alloc<'r>(&'r self) -> SlabBox<'r, T> {
+  pub unsafe fn dirty_alloc<'r>(&'r self) -> SlabBox<'r, T> {
     self.all_alloc(None)
   }
-
 
   pub fn alloc<'r>(&'r self, value: T) -> SlabBox<'r, T> {
     self.all_alloc(Some(value))
   }
 
-  /**
-   * TODO: Have a way to return possibly dirty objects.
-   *
-   * Idea: value of type Option<T>. Then, if Some, use the value inside as the
-   * initial value of the slab allocated object. If none, give unclean memory.
-   * 
-   * Alternatively, have an alloc_dirty that always returns possibly dirty
-   * values.
-   */
   fn all_alloc<'r>(&'r self, value: Option<T>) -> SlabBox<'r, T> {
     let (alloc, capacity) = (self.alloc.get(), self.capacity.get());
     if alloc >= capacity {
@@ -579,7 +569,7 @@ mod tests {
 
     // Making sure dirty_alloc returns the same structure.
     {
-      let object = slab_allocator.dirty_alloc();
+      let object = unsafe { slab_allocator.dirty_alloc() };
       assert_eq!(object.value, 3490);
       assert_eq!(object.value2, 871);
     }
@@ -590,8 +580,8 @@ mod tests {
 
     // Allocating two objects. First should be dirty with same values, second
     // shouldn't have the same values.
-    let object1 = slab_allocator.dirty_alloc();
-    let object2 = slab_allocator.dirty_alloc();
+    let object1 = unsafe { slab_allocator.dirty_alloc() };
+    let object2 = unsafe { slab_allocator.dirty_alloc() };
 
     assert_eq!(object1.value, 3490);
     assert_eq!(object1.value2, 871);
