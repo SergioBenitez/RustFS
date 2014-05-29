@@ -5,29 +5,40 @@
 /**
  * A growing (not yet shrinking), typed slab allocator.
  *
- * To use:
+ * Example usage:
  *
- * let s = SlabAllocator::new(10);
- * {
- *   let mut first = s.alloc(0); // Type is SlabBox<'a, int>
- *   *first = 10;
- *   assert_eq!(*first, 10);
+ *   // Crate new allocator with initial 10 objects
+ *   let s = SlabAllocator::new(10);
+ *   {
+ *     // allocate int with value 10
+ *     let first = s.alloc(10); // Type is SlabBox<'a, int>
+ *     assert_eq!(*first, 10);
  *
- *   let mut second = s.alloc(0);
- *   *second = 20;
- *   assert_eq!(*first, 20);
- *   assert_eq!(*second, *first);
+ *     let mut second = s.alloc(349);
+ *     assert_eq!(*second, 349);
  *
- *   let third = first.clone(); // Referencing same as first.
- *   assert!(*first == *third);
+ *     // second is mutable, set it to 20
+ *     *second = 20;
+ *     assert_eq!(*second, 20);
  *
- *   *second = 30;
- *   assert_eq!(*first == 30);
- *   assert_eq!(*first == *third);
- *   assert_eq!(*second == *third);
- * } // first, second, third returned to allocator.
+ *     // Create new reference to first allocation.
+ *     let mut third = first.clone();
+ *     assert_eq!(*first, *third);
+ *      
+ *     // Changing value of third allocation, which changes value of first.
+ *     *third = 30;
+ *     assert_eq!(*first, 30);
+ *     assert_eq!(*first, *third);
+ *
+ *     // Verifying allocator knows that two objects are living.
+ *     let (allocated, _) = s.stats();
+ *     assert_eq!(allocated, 2);
+ *   } // first, second deallocated, third dropped (was clone => no dealloc)
+ *   
+ *   // Verifying allocations were returned
+ *   let (allocated, _) = s.stats();
+ *   assert_eq!(allocated, 0);
  */
-
 extern crate libc;
 
 use std::mem;
@@ -224,6 +235,34 @@ mod tests {
       // println!("Being dropped.");
       if !self.done { fail!("Should not be dropped: {}", self.done); }
     }
+  }
+
+  #[test]
+  fn test_header_example() {
+    let s = SlabAllocator::new(10);
+    {
+      let first = s.alloc(10); // Type is SlabBox<'a, int>
+      assert_eq!(*first, 10);
+
+      let mut second = s.alloc(349);
+      assert_eq!(*second, 349);
+
+      *second = 20;
+      assert_eq!(*second, 20);
+
+      let mut third = first.clone(); // Referencing same as first.
+      assert_eq!(*first, *third);
+
+      *third = 30;
+      assert_eq!(*first, 30);
+      assert_eq!(*first, *third);
+
+      let (allocated, _) = s.stats();
+      assert_eq!(allocated, 2);
+    } // first, second deallocated, third dropped (but was clone, so no dealloc)
+
+    let (allocated, _) = s.stats();
+    assert_eq!(allocated, 0);
   }
 
   #[test]
