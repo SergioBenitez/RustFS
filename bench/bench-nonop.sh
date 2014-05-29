@@ -12,5 +12,4 @@ echo "Compling RustFS..."
 rustc -L. ../src/proc.rs
 
 echo "Compiling Benchmarks..."
-rustc bench.rs -g -L. -o bench.out -C link-args="-lprofiler"
-CPUPROFILE=/tmp/cpuprofile ./bench.out
+rustc bench.rs -g -L. -o bench.out

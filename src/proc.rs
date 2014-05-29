@@ -1,7 +1,9 @@
-#![feature(macro_rules)]
+#![feature(macro_rules, phase)]
 #![crate_type = "lib"]
 #![crate_id = "rustfs"]
 
+#[phase(syntax)]
+extern crate ary;
 extern crate rand;
 extern crate time;
 extern crate collections;
@@ -15,7 +17,7 @@ use std::rc::Rc;
 use std::cell::{RefCell};
 use collections::HashMap;
 use directory::DirectoryHandle;
-use slab::{SlabAllocator, SlabBox};
+use slab::{SlabAllocator};
 
 mod directory;
 mod file;
@@ -39,8 +41,8 @@ pub struct GlobalAllocators<'r> {
 pub fn create_allocators() -> GlobalAllocators {
   GlobalAllocators {
     inode: SlabAllocator::new(1),
-    page: SlabAllocator::new(40),
-    handle: SlabAllocator::new(100)
+    page: SlabAllocator::new(50),
+    handle: SlabAllocator::new(1)
   }
 }
 

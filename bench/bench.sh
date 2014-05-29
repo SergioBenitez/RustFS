@@ -9,6 +9,7 @@ echo "Compling Slab Allocator Library..."
 rustc --opt-level=3 ../libslab/lib.rs
 
 echo "Compling RustFS..."
+rustc --opt-level=3 ../src/ary.rs
 rustc -L. --opt-level=3 ../src/proc.rs
 
 echo "Compiling Benchmarks..."

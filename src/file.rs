@@ -6,7 +6,6 @@ use std::rc::Rc;
 use std::cell::{Cell, RefCell};
 use inode::{Inode};
 use directory::DirectoryHandle;
-use slab::{SlabAllocator, SlabBox};
 
 type RcDirContent<'r> = Rc<RefCell<Box<DirectoryContent<'r>>>>;
 type RcInode<'r> = Rc<RefCell<Box<Inode<'r>>>>;

@@ -1,6 +1,5 @@
 use time;
 use time::Timespec;
-use std::mem;
 use slab::{SlabBox};
 use super::GlobalAllocators;
 
@@ -19,25 +18,9 @@ fn ceil_div(x: uint, y: uint) -> uint {
   return (x + y - 1) / y;
 }
 
-macro_rules! expand(
-  ($item:expr | $num:expr) => ({
-    $item, expand!($item | $num - 1)
-  });
-
-  ($item:expr, $num:expr) => ({
-    [$item, expand!($item | $num - 1)]
-  });
-)
-
 #[inline(always)]
 pub fn create_tlist<T>() -> TList<T> {
-  let x: TList<T> = box () ([None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>]);
-  x
-
-//   let mut list: TList<T> = box unsafe { mem::uninitialized() }; 
-//   for x in list.mut_iter() { unsafe { mem::overwrite(x, None); } };
-
-//   list
+  box ary![None::<T>, ..256]
 }
 
 pub struct Inode<'r> {
@@ -54,8 +37,6 @@ pub struct Inode<'r> {
 
 impl<'r> Inode<'r> {
   pub fn new(allocators: &'r GlobalAllocators<'r>) -> Inode<'r> {
-    use std::mem::{size_of_val, size_of};
-
     let time_now = time::get_time();
 
     Inode {

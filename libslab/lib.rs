@@ -63,9 +63,7 @@ impl<'a, T: Eq> Eq for Slab<'a, T> {
 #[unsafe_destructor]
 impl<'a, T> Drop for Slab<'a, T> {
   fn drop(&mut self) {
-    // println!("Before");
     self.parent.free(self.ptr);
-    // println!("After");
   }
 }
 
