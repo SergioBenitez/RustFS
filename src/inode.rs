@@ -189,7 +189,6 @@ mod tests {
   extern crate slab;
 
   use super::{Inode};
-  use slab::SlabAllocator;
   use rand::random;
   use super::super::create_allocators;
   

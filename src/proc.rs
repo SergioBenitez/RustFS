@@ -136,22 +136,22 @@ mod proc_tests {
   use file::{SeekSet};
   use inode::Inode;
   use rand::random;
-  use slab::SlabAllocator;
 
   static mut test_inode_drop: bool = false;
 
-  // impl Drop for Inode {
-  //   fn drop(&mut self) {
-  //     unsafe {
-  //       if test_inode_drop {
-  //         test_inode_drop = false;
-  //         fail!("Dropping.");
-  //       } else {
-  //         println!("Dropping, but no flag.");
-  //       }
-  //     }
-  //   }
-  // }
+  #[unsafe_destructor]
+  impl<'r> Drop for Inode<'r> {
+    fn drop(&mut self) {
+      unsafe {
+        if test_inode_drop {
+          test_inode_drop = false;
+          fail!("Dropping.");
+        } else {
+          println!("Dropping, but no flag.");
+        }
+      }
+    }
+  }
 
   fn rand_array(size: uint) -> Vec<u8> {
     Vec::from_fn(size, |_| {
@@ -166,13 +166,6 @@ mod proc_tests {
       assert_eq!(first[i], second[i]);
     }
   }
-
-  // macro_rules! new_proc(
-  //   () => ({
-  //     let allocator = SlabAllocator::new(20);
-  //     Proc::new(&allocator)
-  //   })
-  // )
 
   #[test]
   fn simple_test() {
@@ -213,122 +206,128 @@ mod proc_tests {
     assert_eq!(fd4, -2);
   }
 
-  // #[test]
-  // #[should_fail]
-  // fn test_proc_drop_inode_dealloc() {
-  //   // Variable is used to make sure that the Drop implemented is only valid for
-  //   // tests that set that test_inode_drop global variable to true.
-  //   unsafe { test_inode_drop = true; }
+  #[test]
+  #[should_fail]
+  fn test_proc_drop_inode_dealloc() {
+    // Variable is used to make sure that the Drop implemented is only valid for
+    // tests that set that test_inode_drop global variable to true.
+    unsafe { test_inode_drop = true; }
 
-  //   static size: uint = 4096 * 3 + 3498;
-  //   let mut p = Proc::new();
-  //   let data = rand_array(size);
+    static size: uint = 4096 * 3 + 3498;
+    let allocator = create_allocators();
+    let mut p = Proc::new(&allocator);
+    let data = rand_array(size);
 
-  //   let fd = p.open("file", O_RDWR | O_CREAT);
-  //   p.write(fd, data.as_slice());
-  // }
+    let fd = p.open("file", O_RDWR | O_CREAT);
+    p.write(fd, data.as_slice());
+  }
 
-  // /**
-  //  * This function makes sure that on unlink, the inode's data structure is
-  //  * indeed dropped. This means that a few things have gone right:
-  //  *
-  //  * 1) The FileHandle was dropped. If it wasn't, it would hold a reference to
-  //  *    the file and so the file wouldn't be dropped. This should happen on
-  //  *    close.
-  //  * 2) The File, containing the Inode, was dropped. This should happen on
-  //  *    unlink.
-  //  */
-  // #[test]
-  // #[should_fail]
-  // fn test_inode_dealloc() {
-  //   // Make sure flag is set to detect drop.
-  //   unsafe { test_inode_drop = true; }
+  /**
+   * This function makes sure that on unlink, the inode's data structure is
+   * indeed dropped. This means that a few things have gone right:
+   *
+   * 1) The FileHandle was dropped. If it wasn't, it would hold a reference to
+   *    the file and so the file wouldn't be dropped. This should happen on
+   *    close.
+   * 2) The File, containing the Inode, was dropped. This should happen on
+   *    unlink.
+   */
+  #[test]
+  #[should_fail]
+  fn test_inode_dealloc() {
+    // Make sure flag is set to detect drop.
+    unsafe { test_inode_drop = true; }
 
-  //   static size: uint = 4096 * 3 + 3498;
-  //   let mut p = Proc::new();
-  //   let data = rand_array(size);
-  //   let mut buf = [0u8, ..size];
-  //   let filename = "first_file";
+    static size: uint = 4096 * 3 + 3498;
+    let allocators = create_allocators();
+    let mut p = Proc::new(&allocators);
+    let data = rand_array(size);
+    let mut buf = [0u8, ..size];
+    let filename = "first_file";
 
-  //   let fd = p.open(filename, O_RDWR | O_CREAT);
-  //   p.write(fd, data.as_slice());
-  //   p.seek(fd, 0, SeekSet);
-  //   p.read(fd, buf);
+    let fd = p.open(filename, O_RDWR | O_CREAT);
+    p.write(fd, data.as_slice());
+    p.seek(fd, 0, SeekSet);
+    p.read(fd, buf);
 
-  //   assert_eq_buf(data.as_slice(), buf);
+    assert_eq_buf(data.as_slice(), buf);
 
-  //   // close + unlink should remove both references to inode, dropping it,
-  //   // causing a failure
-  //   p.close(fd);
-  //   p.unlink(filename);
+    // close + unlink should remove both references to inode, dropping it,
+    // causing a failure
+    p.close(fd);
+    p.unlink(filename);
     
-  //   // If inode is not being dropped properly, ie, on the unlink call this will
-  //   // cause a double failure: once for fail! call, and once when then the Inode
-  //   // is dropped since the Proc structure will be dropped.
-  //   //
-  //   // To test that RC is working properly, make sure that a double failure
-  //   // occurs when either the close or unlink calls above are commented out.
-  //   fail!("Inode not dropped!");
-  // }
+    // If inode is not being dropped properly, ie, on the unlink call this will
+    // cause a double failure: once for fail! call, and once when then the Inode
+    // is dropped since the Proc structure will be dropped.
+    //
+    // To test that RC is working properly, make sure that a double failure
+    // occurs when either the close or unlink calls above are commented out.
+    fail!("Inode not dropped!");
+  }
 
-  // #[test]
-  // fn test_max_singly_file_size() {
-  //   static size: uint = 4096 * 256;
-  //   let allocator = SlabAllocator::new(500);
-  //   let mut p = Proc::new(&allocator);
+  #[test]
+  fn test_max_singly_file_size() {
+    static size: uint = 4096 * 256;
+    let allocators = create_allocators();
+    let mut p = Proc::new(&allocators);
 
-  //   let data = rand_array(size);
-  //   let mut buf = [0u8, ..size];
-  //   let filename = "first_file";
+    let data = rand_array(size);
+    let mut buf = [0u8, ..size];
+    let filename = "first_file";
 
-  //   let fd = p.open(filename, O_RDWR | O_CREAT);
-  //   p.write(fd, data.as_slice());
-  //   p.seek(fd, 0, SeekSet);
-  //   p.read(fd, buf);
+    let fd = p.open(filename, O_RDWR | O_CREAT);
+    p.write(fd, data.as_slice());
+    p.seek(fd, 0, SeekSet);
+    p.read(fd, buf);
     
-  //   assert_eq_buf(data.as_slice(), buf);
+    assert_eq_buf(data.as_slice(), buf);
 
-  //   p.close(fd);
-  //   p.unlink(filename);
+    p.close(fd);
+    p.unlink(filename);
 
-  //   let fd4 = p.open(filename, O_RDWR);
-  //   assert_eq!(fd4, -2);
-  // }
+    let fd4 = p.open(filename, O_RDWR);
+    assert_eq!(fd4, -2);
+  }
 
-  // #[test]
-  // fn test_max_file_size() {
-  //   static size: uint = 2 * 4096 * 256;
-  //   let mut p = Proc::new();
-  //   let data1 = rand_array(size);
-  //   let data2 = rand_array(size);
-  //   let mut buf = box [0u8, ..size];
-  //   let filename = "first_file";
+  #[test]
+  fn test_max_file_size() {
+    static size: uint = 2 * 4096 * 256;
+    let allocators = create_allocators();
+    let mut p = Proc::new(&allocators);
 
-  //   let fd = p.open(filename, O_RDWR | O_CREAT);
-  //   p.write(fd, data1.as_slice());
-  //   p.seek(fd, 4096 * 257 * 256 - size as int, SeekSet);
-  //   p.write(fd, data2.as_slice());
+    let data1 = rand_array(size);
+    let data2 = rand_array(size);
+    let mut buf = box [0u8, ..size];
+    let filename = "first_file";
 
-  //   p.seek(fd, 0, SeekSet);
-  //   p.read(fd, buf);
-  //   assert_eq_buf(data1.as_slice(), buf);
+    let fd = p.open(filename, O_RDWR | O_CREAT);
+    p.write(fd, data1.as_slice());
+    p.seek(fd, 4096 * 257 * 256 - size as int, SeekSet);
+    p.write(fd, data2.as_slice());
 
-  //   p.seek(fd, 4096 * 257 * 256 - size as int, SeekSet);
-  //   p.read(fd, buf);
-  //   assert_eq_buf(data2.as_slice(), buf);
-  // }
+    p.seek(fd, 0, SeekSet);
+    p.read(fd, buf);
+    assert_eq_buf(data1.as_slice(), buf);
 
-  // #[test]
-  // #[should_fail]
-  // fn test_morethan_max_file_size() {
-  //   static size: uint = 2 * 4096 * 256;
-  //   let mut p = Proc::new();
-  //   let data = rand_array(size);
-  //   let filename = "first_file";
+    p.seek(fd, 4096 * 257 * 256 - size as int, SeekSet);
+    p.read(fd, buf);
+    assert_eq_buf(data2.as_slice(), buf);
+  }
 
-  //   let fd = p.open(filename, O_RDWR | O_CREAT);
-  //   p.write(fd, data.as_slice());
-  //   p.seek(fd, 4096 * 257 * 256 + 1 - size as int, SeekSet);
-  //   p.write(fd, data.as_slice());
-  // }
+  #[test]
+  #[should_fail]
+  fn test_morethan_max_file_size() {
+    static size: uint = 2 * 4096 * 256;
+
+    let allocators = create_allocators();
+    let mut p = Proc::new(&allocators);
+    let data = rand_array(size);
+    let filename = "first_file";
+
+    let fd = p.open(filename, O_RDWR | O_CREAT);
+    p.write(fd, data.as_slice());
+    p.seek(fd, 4096 * 257 * 256 + 1 - size as int, SeekSet);
+    p.write(fd, data.as_slice());
+  }
 }
