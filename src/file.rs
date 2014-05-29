@@ -6,6 +6,7 @@ use std::rc::Rc;
 use std::cell::{Cell, RefCell};
 use inode::{Inode};
 use directory::DirectoryHandle;
+use slab::{SlabAllocator, SlabBox};
 
 type RcDirContent<'r> = Rc<RefCell<Box<DirectoryContent<'r>>>>;
 type RcInode<'r> = Rc<RefCell<Box<Inode<'r>>>>;
@@ -78,7 +79,19 @@ impl<'r> File<'r> {
 }
 
 impl<'r> FileHandle<'r> {
-  // Probably not the right type.
+  // pub fn new(a: &'r SlabAllocator<FileHandle<'r>>, file: File<'r>) -> SlabBox<'r, FileHandle<'r>> {
+  //   use std::mem::overwrite;
+  //   let mut handle = a.dirty_alloc();
+  //   unsafe { overwrite(&mut handle.file as *mut File<'r>, file); }
+  //   handle.seek = Cell::new(0);
+  //   handle
+
+// //     a.alloc(FileHandle {
+// //       file: file,
+// //       seek: Cell::new(0)
+// //     })
+  // }
+
   pub fn new(file: File<'r>) -> FileHandle<'r> {
     FileHandle {
       file: file,

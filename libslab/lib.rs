@@ -33,7 +33,8 @@ extern crate libc;
 use std::mem;
 use std::mem::transmute;
 use std::rc::Rc;
-use libc::{size_t, malloc};
+use libc::{size_t, malloc, free};
+use libc::types::common::c95::c_void;
 use std::cell::{Cell, RefCell};
 use std::intrinsics;
 
@@ -62,7 +63,9 @@ impl<'a, T: Eq> Eq for Slab<'a, T> {
 #[unsafe_destructor]
 impl<'a, T> Drop for Slab<'a, T> {
   fn drop(&mut self) {
+    // println!("Before");
     self.parent.free(self.ptr);
+    // println!("After");
   }
 }
 
@@ -101,8 +104,8 @@ impl<'a, T> DerefMut<T> for SlabBox<'a, T> {
 pub struct SlabAllocator<T> {
   items: Vec<*mut T>,       // holds pointers to allocations
   alloc: Cell<uint>,        // number of outstanding items
-  capacity: Cell<uint>      // number of items pre-allocated (valid in items)
-
+  capacity: Cell<uint>,     // number of items pre-allocated (valid in items)
+  chunks: Vec<*mut T>,      // holds pointers to each chunk for freeing
 }
 
 impl<T> SlabAllocator<T> {
@@ -110,7 +113,8 @@ impl<T> SlabAllocator<T> {
     let mut allocator = SlabAllocator {
       items: Vec::with_capacity(initial_size),
       alloc: Cell::new(0),
-      capacity: Cell::new(0)
+      capacity: Cell::new(0),
+      chunks: Vec::with_capacity(20)
     };
 
     allocator.expand(initial_size);
@@ -120,12 +124,11 @@ impl<T> SlabAllocator<T> {
   // pre-allocates and additional new_items and adds them to the end of
   // self.items, increasing self.capacity with the new size
   fn expand(&mut self, new_items: uint) {
-    println!("Expanding by {}: {} bytes", new_items, mem::size_of::<T>() * new_items);
-
     unsafe {
       let memory = malloc((mem::size_of::<T>() * new_items) as size_t) as *mut T;
       assert!(!memory.is_null());
 
+      self.chunks.push(memory);
       for i in range(0, new_items as int) {
         self.items.push(memory.offset(i));
       }
@@ -135,13 +138,11 @@ impl<T> SlabAllocator<T> {
   }
 
   pub fn dirty_alloc<'r>(&'r self) -> SlabBox<'r, T> {
-    // print!(".");
     self.all_alloc(None)
   }
 
 
   pub fn alloc<'r>(&'r self, value: T) -> SlabBox<'r, T> {
-    // print!("*");
     self.all_alloc(Some(value))
   }
 
@@ -176,8 +177,6 @@ impl<T> SlabAllocator<T> {
   }
 
   fn free(&self, ptr: *mut T) {
-    print!("-");
-
     let alloc = self.alloc.get();
     if alloc <= 0 { fail!("Over-freeing....somehow"); }
 
@@ -200,6 +199,15 @@ impl<T> SlabAllocator<T> {
   }
 }
 
+#[unsafe_destructor]
+impl<T> Drop for SlabAllocator<T> {
+  fn drop(&mut self) {
+    for chunk in self.chunks.iter() {
+      unsafe { free(*chunk as *mut c_void); }
+    }
+  }
+}
+
 #[cfg(test)]
 mod tests {
   extern crate test;
@@ -215,7 +223,7 @@ mod tests {
 
   impl Drop for MyThing {
     fn drop(&mut self) {
-      println!("Being dropped.");
+      // println!("Being dropped.");
       if !self.done { fail!("Should not be dropped: {}", self.done); }
     }
   }

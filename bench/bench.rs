@@ -3,12 +3,10 @@
 extern crate rand;
 extern crate bench;
 extern crate rustfs;
-extern crate slab;
 
-use rustfs::{Proc, O_CREAT, O_RDWR, FileDescriptor};
+use rustfs::{Proc, O_CREAT, O_RDWR, FileDescriptor, create_allocators};
 use std::string::String;
 use rand::random;
-use slab::SlabAllocator;
 use bench::{benchmark, Benchmarker};
 
 static NUM: uint = 100;
@@ -17,8 +15,8 @@ macro_rules! bench(
   ($wrap:ident, $name:ident, $time:expr, |$p:ident, $filenames:ident| $task:stmt) => ({
     let $filenames = generate_names(NUM);
     let $wrap = |b: &mut Benchmarker| {
-      let allocator = SlabAllocator::new(500);
-      let mut $p = Proc::new(&allocator);
+      let allocators = create_allocators();
+      let mut $p = Proc::new(&allocators);
       b.run(|| {
         $task
       });
@@ -31,8 +29,8 @@ macro_rules! bench_many(
   ($wrap:ident, $name:ident, $time:expr, |$p:ident, $fd:ident, $filename:ident| $op:stmt) => ({
     let filenames = generate_names(NUM);
     let $wrap = |b: &mut Benchmarker| {
-      let allocator = SlabAllocator::new(500);
-      let mut $p = Proc::new(&allocator);
+      let allocators = create_allocators();
+      let mut $p = Proc::new(&allocators);
       b.run(|| {
         for i_j in range(0, NUM) {
           let $filename = filenames.get(i_j).as_slice();

@@ -1,7 +1,8 @@
 use time;
 use time::Timespec;
 use std::mem;
-use slab::{SlabAllocator, SlabBox};
+use slab::{SlabBox};
+use super::GlobalAllocators;
 
 static PAGE_SIZE: uint = 4096;
 static LIST_SIZE: uint = 256;
@@ -18,11 +19,25 @@ fn ceil_div(x: uint, y: uint) -> uint {
   return (x + y - 1) / y;
 }
 
+macro_rules! expand(
+  ($item:expr | $num:expr) => ({
+    $item, expand!($item | $num - 1)
+  });
+
+  ($item:expr, $num:expr) => ({
+    [$item, expand!($item | $num - 1)]
+  });
+)
+
 #[inline(always)]
 pub fn create_tlist<T>() -> TList<T> {
-  let mut list: TList<T> = box unsafe { mem::uninitialized() }; 
-  for x in list.mut_iter() { unsafe { mem::overwrite(x, None); } };
-  list
+  let x: TList<T> = box () ([None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>, None::<T>]);
+  x
+
+//   let mut list: TList<T> = box unsafe { mem::uninitialized() }; 
+//   for x in list.mut_iter() { unsafe { mem::overwrite(x, None); } };
+
+//   list
 }
 
 pub struct Inode<'r> {
@@ -34,11 +49,13 @@ pub struct Inode<'r> {
   access_time: Timespec,
   create_time: Timespec,
 
-  page_allocator: &'r SlabAllocator<RawPage>
+  allocators: &'r GlobalAllocators<'r>
 }
 
 impl<'r> Inode<'r> {
-  pub fn new(page_allocator: &'r SlabAllocator<RawPage>) -> Inode<'r> {
+  pub fn new(allocators: &'r GlobalAllocators<'r>) -> Inode<'r> {
+    use std::mem::{size_of_val, size_of};
+
     let time_now = time::get_time();
 
     Inode {
@@ -50,7 +67,7 @@ impl<'r> Inode<'r> {
       access_time: time_now,
       create_time: time_now,
 
-      page_allocator: page_allocator,
+      allocators: allocators
     }
   }
 
@@ -81,7 +98,7 @@ impl<'r> Inode<'r> {
 
     match page {
       // &None => *page = Some(box () ([0u8, ..4096])),
-      &None => *page = Some(self.page_allocator.dirty_alloc()),
+      &None => *page = Some(self.allocators.page.dirty_alloc()),
       _ => { /* Do Nothing */ }
     }
 
@@ -193,6 +210,7 @@ mod tests {
   use super::{Inode};
   use slab::SlabAllocator;
   use rand::random;
+  use super::super::create_allocators;
   
   fn rand_array(size: uint) -> Vec<u8> {
     Vec::from_fn(size, |_| {
@@ -205,8 +223,8 @@ mod tests {
     static size: uint = 4096 * 8 + 3434;
 
     let original_data = rand_array(size);
-    let page_allocator = SlabAllocator::new(10);
-    let mut inode = Inode::new(&page_allocator);
+    let allocators = create_allocators();
+    let mut inode = Inode::new(&allocators);
     let mut buf = [0u8, ..size];
 
     // Write the random data, read it back into buffer
