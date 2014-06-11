@@ -24,8 +24,8 @@ pub fn create_tlist<T>() -> TList<T> {
 }
 
 pub struct Inode<'r> {
-  single: EntryList<'r>, // Box<[Option<SlabBox<RawPage>>, ..256]>
-  double: DoubleEntryList<'r>, // Box<[Option<EntryList>, ..256]>
+  single: Option<EntryList<'r>>, // Box<[Option<SlabBox<RawPage>>, ..256]>
+  double: Option<DoubleEntryList<'r>>, // Box<[Option<EntryList>, ..256]>
   size: uint,
 
   mod_time: Timespec,
@@ -40,8 +40,8 @@ impl<'r> Inode<'r> {
     let time_now = time::get_time();
 
     Inode {
-      single: create_tlist(),
-      double: create_tlist(),
+      single: None, // Will be lazy loaded.
+      double: None,
       size: 0,
 
       mod_time: time_now,
@@ -60,13 +60,23 @@ impl<'r> Inode<'r> {
     // Getting a pointer to the page
     let page = if num < LIST_SIZE {
       // if the page num is in the singly-indirect list
-      &mut self.single[num]
+      if self.single.is_none() {
+        self.single = Some(create_tlist());
+      }
+
+      let single = self.single.get_mut_ref();
+      &mut single[num]
     } else {
       // if the page num is in the doubly-indirect list. We allocate a new
       // entry list where necessary (*entry_list = ...)
+      if self.double.is_none() {
+        self.double = Some(create_tlist());
+      }
+
+      let double = self.double.get_mut_ref();
       let doubleEntry = num - LIST_SIZE;
       let slot = doubleEntry / LIST_SIZE;
-      let entry_list = &mut self.double[slot];
+      let entry_list = &mut double[slot];
 
       match entry_list {
         &None => *entry_list = Some(create_tlist()),
@@ -92,12 +102,13 @@ impl<'r> Inode<'r> {
     };
 
     if num < LIST_SIZE {
-      &self.single[num]
+      if self.single.is_none() { fail!("Page does not exist.") }
+      &self.single.get_ref()[num]
     } else {
       let doubleEntry = num - LIST_SIZE;
       let slot = doubleEntry / LIST_SIZE;
       let entry_offset = doubleEntry % LIST_SIZE;
-      let entry_list = &self.double[slot];
+      let entry_list = &self.double.get_ref()[slot];
 
       match entry_list {
         &None => fail!("Page does not exist."),
