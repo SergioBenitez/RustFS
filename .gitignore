@@ -38,6 +38,7 @@ Session.vim
 *.rlib
 *.lib
 *.a
+*.dsym
 
 # Shared objects (inc. Windows DLLs)
 *.dll

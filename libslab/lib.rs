@@ -5,7 +5,7 @@
 /**
  * A growing (not yet shrinking), typed slab allocator.
  *
- * Example usage:
+ * Example usage (a bit silly since ints are 8 bytes!):
  *
  *   // Crate new allocator with initial 10 objects
  *   let s = SlabAllocator::new(10);
