@@ -1,7 +1,6 @@
 extern crate time;
-extern crate collections;
 
-use collections::hashmap::HashMap;
+use std::collections::hashmap::HashMap;
 use std::rc::Rc;
 use std::cell::{Cell, RefCell};
 use inode::{Inode};

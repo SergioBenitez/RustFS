@@ -1,7 +1,7 @@
 use time;
 use time::Timespec;
 use std::mem;
-// use std::slice::MutableCloneableVector;
+use std::ptr;
 
 static PAGE_SIZE: uint = 4096;
 static LIST_SIZE: uint = 256;
@@ -20,7 +20,7 @@ fn ceil_div(x: uint, y: uint) -> uint {
 #[inline(always)]
 pub fn create_tlist<T>() -> TList<T> {
   let mut list: TList<T> = box unsafe { mem::uninitialized() }; 
-  for x in list.mut_iter() { unsafe { mem::overwrite(x, None); } };
+  for x in list.mut_iter() { unsafe { ptr::write(x, None); } };
   list
 }
 
@@ -135,6 +135,10 @@ impl Inode {
     let last_byte = offset + written;
     if self.size < last_byte { self.size = last_byte; }
 
+    let time_now = time::get_time();
+    self.mod_time = time_now;
+    self.access_time = time_now;
+
     written
   }
 
@@ -178,14 +182,17 @@ impl Inode {
   pub fn size(&self) -> uint {
     self.size
   }
+
+  pub fn stat(&self) -> (Timespec, Timespec, Timespec) {
+    (self.create_time, self.access_time, self.mod_time)
+  }
 }
 
 #[cfg(test)]
 mod tests {
-  extern crate rand;
-
   use super::{Inode};
-  use rand::random;
+  use std::rand::random;
+  use time;
   
   fn rand_array(size: uint) -> Vec<u8> {
     Vec::from_fn(size, |_| {
@@ -198,6 +205,7 @@ mod tests {
     static size: uint = 4096 * 8 + 3434;
 
     let original_data = rand_array(size);
+    let time_now = time::get_time();
     let mut inode = Inode::new();
     let mut buf = [0u8, ..size];
 
@@ -212,5 +220,8 @@ mod tests {
     for i in range(0, size) {
       assert_eq!(buf[i], *original_data.get(i));
     }
+
+    let (create, _, _) = inode.stat();
+    assert_eq!(create.sec, time_now.sec);
   }
 }

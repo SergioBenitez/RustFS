@@ -1,13 +1,12 @@
 #![feature(macro_rules)]
 
-extern crate rand;
 extern crate bench;
 extern crate rustfs;
 
 use rustfs::{Proc, O_CREAT, O_RDWR, FileDescriptor};
 use std::string::String;
-use rand::random;
 use bench::{benchmark, Benchmarker};
+use std::rand::random;
 
 static NUM: uint = 100;
 

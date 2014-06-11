@@ -1,16 +1,14 @@
 #![crate_type = "lib"]
 #![crate_id = "rustfs"]
 
-extern crate rand;
 extern crate time;
-extern crate collections;
 
 pub use file::Whence;
 use file::{File, EmptyFile, DataFile, Directory, FileHandle};
 use inode::Inode;
 use std::rc::Rc;
 use std::cell::{RefCell};
-use collections::HashMap;
+use std::collections::HashMap;
 use directory::DirectoryHandle;
 
 mod directory;
@@ -110,7 +108,7 @@ mod proc_tests {
   use super::{Proc, O_RDWR, O_CREAT};
   use file::{SeekSet};
   use inode::Inode;
-  use rand::random;
+  use std::rand::random;
 
   static mut test_inode_drop: bool = false;
 
