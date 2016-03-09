@@ -7,7 +7,7 @@ Usage
 -----
 First, compile the RustFS library:
 
-	rustc --opt-level=3 src/proc.rs
+	rustc -C opt-level=3 src/proc.rs
 	
 Place the resulting librustfs file into the directory where you progam lives.
 
