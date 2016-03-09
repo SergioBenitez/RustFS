@@ -1,0 +1,11 @@
+[package]
+name = "rustfs"
+version = "0.1.0"
+authors = ["Sergio Benitez <sbenitez@mit.edu>"]
+
+[dependencies]
+time = "0.1.34"
+
+[lib]
+test = true
+path = "src/proc.rs"

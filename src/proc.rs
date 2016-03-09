@@ -4,7 +4,9 @@
 extern crate time;
 
 pub use file::Whence;
-use file::{File, EmptyFile, DataFile, Directory, FileHandle};
+use file::{File, FileHandle};
+use file::File::{EmptyFile, DataFile, Directory};
+
 use inode::Inode;
 use std::rc::Rc;
 use std::cell::{RefCell};
@@ -15,7 +17,7 @@ mod directory;
 mod file;
 mod inode;
 
-pub type FileDescriptor = int;
+pub type FileDescriptor = i64;
 
 pub static O_RDONLY: u32 =   (1 << 0);
 pub static O_WRONLY: u32 =   (1 << 1);
@@ -31,11 +33,11 @@ pub struct Proc<'r> {
 }
 
 impl<'r> Proc<'r> {
-  pub fn new() -> Proc {
+  pub fn new() -> Proc <'r> {
     Proc {
       cwd: File::new_dir(None),
       fd_table: HashMap::new(),
-      fds: Vec::from_fn(256 - 2, |i| { 256i - (i as int) })
+      fds: Vec::from_fn(256 - 2, |i| { 256i64 - (i as i64) })
     }
   }
   
@@ -43,7 +45,7 @@ impl<'r> Proc<'r> {
   fn extract_fd(fd_opt: &Option<FileDescriptor>) -> FileDescriptor {
     match fd_opt {
       &Some(fd) => fd,
-      &None => fail!("Error in FD allocation.")
+      &None => panic!("Error in FD allocation.")
     }
   }
 
@@ -54,7 +56,7 @@ impl<'r> Proc<'r> {
       None => {
         if (flags & O_CREAT) != 0 {
           // FIXME: Fetch from allocator
-          let rcinode = Rc::new(RefCell::new(box Inode::new()));
+          let rcinode = Rc::new(RefCell::new(Box::new(Inode::new())));
           let file = File::new_data_file(rcinode);
           self.cwd.insert(path, file.clone());
           file
@@ -76,19 +78,25 @@ impl<'r> Proc<'r> {
     }
   }
 
-  pub fn read(&self, fd: FileDescriptor, dst: &mut [u8]) -> uint {
+  pub fn read(&self, fd: FileDescriptor, dst: &mut [u8]) -> usize {
     let handle = self.fd_table.get(&fd);
-    handle.read(dst)
+    match handle {
+      Some (x) => x.read(dst)
+    }
   }
 
-  pub fn write(&mut self, fd: FileDescriptor, src: &[u8]) -> uint {
+  pub fn write(&mut self, fd: FileDescriptor, src: &[u8]) -> usize {
     let handle = self.fd_table.get_mut(&fd);
-    handle.write(src)
+    match handle {
+      Some (x) => x.write(src)
+    }
   }
 
-  pub fn seek(&mut self, fd: FileDescriptor, o: int, whence: Whence) -> uint {
+  pub fn seek(&mut self, fd: FileDescriptor, o: i64, whence: Whence) -> usize {
     let handle = self.fd_table.get_mut(&fd);
-    handle.seek(o, whence)
+    match handle {
+      Some (x) => x.seek(o, whence)
+    }
   }
 
   pub fn close(&mut self, fd: FileDescriptor) {
@@ -117,7 +125,7 @@ mod proc_tests {
       unsafe {
         if test_inode_drop {
           test_inode_drop = false;
-          fail!("Dropping.");
+          panic!("Dropping.");
         } else {
           println!("Dropping, but no flag.");
         }
@@ -125,7 +133,7 @@ mod proc_tests {
     }
   }
 
-  fn rand_array(size: uint) -> Vec<u8> {
+  fn rand_array(size: usize) -> Vec<u8> {
     Vec::from_fn(size, |_| {
       random::<u8>()
     })
@@ -141,7 +149,7 @@ mod proc_tests {
 
   #[test]
   fn simple_test() {
-    static size: uint = 4096 * 8 + 3434;
+    static size: usize = 4096 * 8 + 3434;
     let mut p = Proc::new();
     let data = rand_array(size);
     let mut buf = [0u8, ..size];
@@ -183,7 +191,7 @@ mod proc_tests {
     // tests that set that test_inode_drop global variable to true.
     unsafe { test_inode_drop = true; }
 
-    static size: uint = 4096 * 3 + 3498;
+    static size: usize = 4096 * 3 + 3498;
     let mut p = Proc::new();
     let data = rand_array(size);
 
@@ -207,7 +215,7 @@ mod proc_tests {
     // Make sure flag is set to detect drop.
     unsafe { test_inode_drop = true; }
 
-    static size: uint = 4096 * 3 + 3498;
+    static size: usize = 4096 * 3 + 3498;
     let mut p = Proc::new();
     let data = rand_array(size);
     let mut buf = [0u8, ..size];
@@ -226,17 +234,17 @@ mod proc_tests {
     p.unlink(filename);
     
     // If inode is not being dropped properly, ie, on the unlink call this will
-    // cause a double failure: once for fail! call, and once when then the Inode
+    // cause a double failure: once for panic! call, and once when then the Inode
     // is dropped since the Proc structure will be dropped.
     //
     // To test that RC is working properly, make sure that a double failure
     // occurs when either the close or unlink calls above are commented out.
-    fail!("Inode not dropped!");
+    panic!("Inode not dropped!");
   }
 
   #[test]
   fn test_max_singly_file_size() {
-    static size: uint = 4096 * 256;
+    static size: usize = 4096 * 256;
     let mut p = Proc::new();
     let data = rand_array(size);
     let mut buf = [0u8, ..size];
@@ -258,7 +266,7 @@ mod proc_tests {
 
   #[test]
   fn test_max_file_size() {
-    static size: uint = 2 * 4096 * 256;
+    static size: usize = 2 * 4096 * 256;
     let mut p = Proc::new();
     let data1 = rand_array(size);
     let data2 = rand_array(size);
@@ -267,14 +275,14 @@ mod proc_tests {
 
     let fd = p.open(filename, O_RDWR | O_CREAT);
     p.write(fd, data1.as_slice());
-    p.seek(fd, 4096 * 257 * 256 - size as int, SeekSet);
+    p.seek(fd, 4096 * 257 * 256 - size as i64, SeekSet);
     p.write(fd, data2.as_slice());
 
     p.seek(fd, 0, SeekSet);
     p.read(fd, buf);
     assert_eq_buf(data1.as_slice(), buf);
 
-    p.seek(fd, 4096 * 257 * 256 - size as int, SeekSet);
+    p.seek(fd, 4096 * 257 * 256 - size as i64, SeekSet);
     p.read(fd, buf);
     assert_eq_buf(data2.as_slice(), buf);
   }
@@ -282,14 +290,14 @@ mod proc_tests {
   #[test]
   #[should_fail]
   fn test_morethan_max_file_size() {
-    static size: uint = 2 * 4096 * 256;
+    static size: usize = 2 * 4096 * 256;
     let mut p = Proc::new();
     let data = rand_array(size);
     let filename = "first_file";
 
     let fd = p.open(filename, O_RDWR | O_CREAT);
     p.write(fd, data.as_slice());
-    p.seek(fd, 4096 * 257 * 256 + 1 - size as int, SeekSet);
+    p.seek(fd, 4096 * 257 * 256 + 1 - size as i64, SeekSet);
     p.write(fd, data.as_slice());
   }
 }
