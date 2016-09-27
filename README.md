@@ -46,6 +46,21 @@ Testing
 Run the tests using `RUST_TEST_THREADS=1 cargo test`. The tests need to be run
 sequentially.
 
+Benchmarking
+------------
+
+You'll need Rust nightly to run the benchmarks. We use a custom built
+benchmarking tool to get accurate results, and that benchmarking tool uses
+assembly. Assembly can only be used in Rust nightly.
+
+To run the benchmarks, switch into the `bench` directory:
+
+    cd bench
+
+Run them with Cargo:
+
+    cargo run --release
+
 Directory Structure
 -------------------
 * bench/
