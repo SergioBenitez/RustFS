@@ -40,6 +40,12 @@ Finally, use `Proc::new()` to create a new `Proc`. Call `open` / `close` /
 For more examples on how to use RustFS, see the benchmarks in bench/bench.rs and
 tests in src/proc.rs.
 
+Testing
+-------
+
+Run the tests using `RUST_TEST_THREADS=1 cargo test`. The tests need to be run
+sequentially.
+
 Directory Structure
 -------------------
 * bench/
