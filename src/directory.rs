@@ -1,6 +1,7 @@
-use file::{File, Directory};
+use file::File;
+use file::File::Directory;
 
-pub trait DirectoryHandle<'r> {
+pub trait DirectoryHandle<'r>: Sized {
   fn is_dir(&self) -> bool;
   fn insert(&mut self, name: &'r str, file: Self);
   fn remove(&mut self, name: &'r str);
@@ -30,7 +31,7 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
   fn get(&self, name: &'r str) -> Option<File<'r>> {
     let rc = self.get_dir_rc();
     let content = rc.borrow();
-    match content.entries.find(&name) {
+    match content.entries.get(&name) {
       None => None,
       Some(ref file) => Some((*file).clone()) // It's RC
     }

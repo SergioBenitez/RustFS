@@ -1,0 +1,10 @@
+[package]
+name = "bench"
+version = "0.1.0"
+authors = ["Sergio Benitez <sb@sergio.bz>"]
+
+[dependencies]
+time = "0.1"
+
+[lib]
+path = "lib.rs"

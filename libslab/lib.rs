@@ -101,13 +101,13 @@ impl<'a, T> DerefMut<T> for SlabBox<'a, T> {
 #[deriving(Show)]
 pub struct SlabAllocator<T> {
   items: Vec<*mut T>,       // holds pointers to allocations
-  alloc: Cell<uint>,        // number of outstanding items
-  capacity: Cell<uint>,     // number of items pre-allocated (valid in items)
+  alloc: Cell<usize>,        // number of outstanding items
+  capacity: Cell<usize>,     // number of items pre-allocated (valid in items)
   chunks: Vec<*mut T>,      // holds pointers to each chunk for freeing
 }
 
 impl<T> SlabAllocator<T> {
-  pub fn new(initial_size: uint) -> SlabAllocator<T> {
+  pub fn new(initial_size: usize) -> SlabAllocator<T> {
     let mut allocator = SlabAllocator {
       items: Vec::with_capacity(initial_size),
       alloc: Cell::new(0),
@@ -121,13 +121,13 @@ impl<T> SlabAllocator<T> {
   
   // pre-allocates and additional new_items and adds them to the end of
   // self.items, increasing self.capacity with the new size
-  fn expand(&mut self, new_items: uint) {
+  fn expand(&mut self, new_items: usize) {
     unsafe {
       let memory = malloc((mem::size_of::<T>() * new_items) as size_t) as *mut T;
       assert!(!memory.is_null());
 
       self.chunks.push(memory);
-      for i in range(0, new_items as int) {
+      for i in range(0, new_items as isize) {
         self.items.push(memory.offset(i));
       }
     }
@@ -166,7 +166,7 @@ impl<T> SlabAllocator<T> {
 
   fn free(&self, ptr: *mut T) {
     let alloc = self.alloc.get();
-    if alloc <= 0 { fail!("Over-freeing....somehow"); }
+    if alloc <= 0 { panic!("Over-freeing....somehow"); }
 
     self.alloc.set(alloc - 1);
     unsafe {
@@ -182,7 +182,7 @@ impl<T> SlabAllocator<T> {
     }
   }
 
-  pub fn stats(&self) -> (uint, uint) {
+  pub fn stats(&self) -> (usize, usize) {
     (self.alloc.get(), self.capacity.get())
   }
 }
@@ -212,7 +212,7 @@ mod tests {
   impl Drop for MyThing {
     fn drop(&mut self) {
       // println!("Being dropped.");
-      if !self.done { fail!("Should not be dropped: {}", self.done); }
+      if !self.done { panic!("Should not be dropped: {}", self.done); }
     }
   }
 
@@ -243,7 +243,7 @@ mod tests {
   }
 
   #[test]
-  #[should_fail]
+  #[should_panic]
   fn test_struct_dealloc() {
     let slab_allocator = SlabAllocator::new(20);
     {
@@ -252,11 +252,11 @@ mod tests {
       assert_eq!(object.field1, Some(box 20));
     }
     // Will cause double-fail if deallocation didn't occur.
-    fail!("Did not dallocate struct in time.");
+    panic!("Did not dallocate struct in time.");
   }
 
   #[test]
-  #[should_fail]
+  #[should_panic]
   fn test_box_struct_dealloc() {
     let slab_allocator = SlabAllocator::new(20);
     {
@@ -265,7 +265,7 @@ mod tests {
       assert_eq!(object.field1, Some(box 2445));
     }
     // Will cause double-fail if deallocation didn't occur.
-    fail!("Did not dallocate struct in time.");
+    panic!("Did not dallocate struct in time.");
   }
 
   #[test]
@@ -463,14 +463,14 @@ mod tests {
     }
 
     impl<'r> MyThing<'r> {
-      fn new(allocator: &'r SlabAllocator<int>, num: int) -> MyThing<'r> {
+      fn new(allocator: &'r SlabAllocator<int>, num: isize) -> MyThing<'r> {
         MyThing {
           item: allocator.alloc(num),
           allocator: allocator,
         }
       }
 
-      fn set_num(&mut self, num: int) {
+      fn set_num(&mut self, num: isize) {
         self.item = self.allocator.alloc(num);
       }
     }
@@ -513,7 +513,7 @@ mod tests {
         thing
       }
 
-      fn set(&'r self, num: int) {
+      fn set(&'r self, num: isize) {
         *self.item.borrow_mut() = Some(self.allocator.alloc(num));
       }
 
@@ -549,8 +549,8 @@ mod tests {
   #[test]
   fn test_dirty_alloc() {
     struct ValHolder {
-      value: int,
-      value2: int
+      value: isize,
+      value2: isize
     }
 
     let slab_allocator = SlabAllocator::new(20);

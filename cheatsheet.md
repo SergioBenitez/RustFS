@@ -170,8 +170,8 @@ Data Structures
 ### Enums w/Struct Variants (not fully supported)
 
     enum Shape {
-      Circle { radius: int },
-      Rectangle { length: int, width: int },
+      Circle { radius: isize },
+      Rectangle { length: isize, width: isize },
       Type3(int),
       Other
     }
@@ -275,7 +275,7 @@ Traits
       fn push(val: &T);
       fn pop() -> Option(T);
     }
-    
+
 ### Implementing Generic Trait
 
     impl Stack<int> for MyIntStack {
@@ -320,7 +320,7 @@ Methods
     let some_val = obj.instance_method(a1, a2);  // Calling instance method.
 
 ### Implementing Traits (Any Type)
-    
+
     impl TraitName for Type {
       fn trait_fn(trait_arg1: Type1, trait_arg2: Type2) -> TraitReturnType {
         TraitReturnType { }
@@ -338,7 +338,7 @@ Common Traits to Implement
 
     trait Iterator<T> {
       fn next(&mut self) -> Option<T>; // Required.
-      fn size_hint(&self) -> (uint, Option<uint>); // Optional
+      fn size_hint(&self) -> (usize, Option<usize>); // Optional
     }
 
 ### Destructor (drop called on deallocation)
@@ -352,7 +352,7 @@ Common Traits to Implement
     pub trait Add/Sub/Mul/Div/Rem<RHS, Result> {
       fn add/sub/mul/div/rem(&self, rhs: &RHS) -> Result;
     }
-    
+
 ### BitAnd/BitOr/BitXor (&|^ operator overloading, called on self &|^ rhs)
 
     pub trait BitAnd/BitOr/BitXor<RHS, Result> {
@@ -382,7 +382,7 @@ Common Traits to Implement
     pub trait DerefMut<Result> : Deref<Result> {
       fn deref_mut<'a>(&'a mut self) -> &'a mut Result;
     }
-      
+
 ### Index ([] operator overloading, called on self[index])
 
     pub trait Index<Index, Result> {
@@ -390,21 +390,21 @@ Common Traits to Implement
     }
 
 ### Eq (==, != operator overloading; called on self == != other)
-    
+
     pub trait Eq {
       fn eq(&self, other: &Self) -> bool;
       fn ne(&self, other: &Self) -> bool { ... has default ... }
     }
 
 ### Ord (<, >, <=, >=)
-    
+
     pub trait Ord : Eq {
       fn lt(&self, other: &Self) -> bool;
 
       fn le(&self, other: &Self) -> bool { ... }
       fn gt(&self, other: &Self) -> bool { ... }
       fn ge(&self, other: &Self) -> bool { ... }
-    } 
+    }
 
 ### Derivable
   * Eq (==, !=)
@@ -429,7 +429,7 @@ To use:
     #[deriving(Rand, Show)]
     enum EnumName { ... }
 
-    
+
 Iterator Protocol
 -----------------
 
@@ -437,7 +437,7 @@ Iterator Protocol
 
     trait Iterator<T> {
       fn next(&mut self) -> Option<T>; // Required.
-      fn size_hint(&self) -> (uint, Option<uint>); // Optional
+      fn size_hint(&self) -> (usize, Option<usize>); // Optional
       // Return a lower bound and upper bound on the remaining length of the
       // iterator. The common use case for the estimate is pre-allocating space
       // to store the results
@@ -447,21 +447,21 @@ Iterator Protocol
 
     struct Repeater<T> {
       value: T,
-      times: uint
+      times: usize
     }
 
     impl<T: Clone> Iterator<T> for Repeater<T> {
       fn next(&mut self) -> Option<T> {
         if self.times > 0 {
           self.times -= 1;
-          Some(self.value.clone()) 
+          Some(self.value.clone())
         } else {
           None
         }
       }
     }
 
-    fn repeat<T>(val: T, times: uint) -> Repeater<T> {
+    fn repeat<T>(val: T, times: usize) -> Repeater<T> {
       Repeater { value: val, times: times }
     }
 
@@ -563,7 +563,7 @@ owning or ownable values (owned values). It is in the distinction of copy-values
 and owned-values that Rust's move and copy semantics come into play.
 
 Types that contain owning pointers or values that implement a destructor via the
-special trait Drop are owned values. All other types are copy values. 
+special trait Drop are owned values. All other types are copy values.
 
 When a value is used as an R-Value, the variable will either be moved or copied,
 depending on its type. If a value is a copy value, assignments of any form to
@@ -609,16 +609,16 @@ piece of code read or modify the underyling value without taking ownership. For
 this, Rust has a solution: the borrowed pointer. A borrowed-pointer is a
 non-owning reference to any value, including owned values. There are immutable
 and mutable variants. If a borrowed reference to a value is currently in scope,
-the value cannot be moved since this would result in a dangling pointer. 
+the value cannot be moved since this would result in a dangling pointer.
 
 Simple Examples:
 
     let a = box 10; // a owns box with 10 in it
-    
+
     {
       let b = &a;     // b is borrowing a's box, a still owns it
       let c = &a;     // c is borrowing a's box, a still owns it
-      // let d = a;   // invalid since borrowed references are in scope 
+      // let d = a;   // invalid since borrowed references are in scope
     } // borrowed pointer now out of scope, can move a's box
 
     let mut d = a;    // a's box moved to d; a is invalid

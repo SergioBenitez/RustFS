@@ -1,31 +1,31 @@
 extern crate time;
 
-use std::collections::hashmap::HashMap;
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::cell::{Cell, RefCell};
 use inode::{Inode};
-use directory::DirectoryHandle;
+use self::File::{DataFile, Directory};
 
-type RcDirContent<'r> = Rc<RefCell<Box<DirectoryContent<'r>>>>;
-type RcInode = Rc<RefCell<Box<Inode>>>;
+pub type RcDirContent<'r> = Rc<RefCell<Box<DirectoryContent<'r>>>>;
+pub type RcInode = Rc<RefCell<Box<Inode>>>;
 
 // File is a thing wrapper around Inodes and Directories. The whole point is to
 // provide a layer of indirection. FileHandle's and Directory entries, then,
 // point to these guys instead of directly to Inodes/Directories
-#[deriving(Clone)]
+#[derive(Clone)]
 pub enum File<'r> {
   DataFile(RcInode),
   Directory(RcDirContent<'r>),
   EmptyFile
 }
 
-#[deriving(Clone)]
+#[derive(Clone)]
 pub struct FileHandle<'r> {
   file: File<'r>,
-  seek: Cell<uint>
+  seek: Cell<usize>
 }
 
-#[deriving(Clone)]
+#[derive(Clone)]
 pub struct DirectoryContent<'r> {
   pub entries: HashMap<&'r str, File<'r>>
 }
@@ -38,7 +38,7 @@ pub enum Whence {
 
 impl<'r> File<'r> {
   pub fn new_dir(_parent: Option<File<'r>>) -> File<'r> {
-    let content = box DirectoryContent { entries: HashMap::new() };
+    let content = Box::new(DirectoryContent { entries: HashMap::new() });
     let rc = Rc::new(RefCell::new(content));
     let dir = Directory(rc);
 
@@ -57,21 +57,21 @@ impl<'r> File<'r> {
     dir
   }
 
-  pub fn new_data_file(inode: RcInode) -> File {
+  pub fn new_data_file(inode: RcInode) -> File<'r> {
     DataFile(inode)
   }
 
   pub fn get_dir_rc<'a>(&'a self) -> &'a RcDirContent<'r> {
     match self {
       &Directory(ref rc) => rc,
-      _ => fail!("not a directory")
+      _ => panic!("not a directory")
     }
   }
 
   pub fn get_inode_rc<'a>(&'a self) -> &'a RcInode {
     match self {
       &DataFile(ref rc) => rc,
-      _ => fail!("not a directory")
+      _ => panic!("not a directory")
     }
   }
 }
@@ -85,7 +85,7 @@ impl<'r> FileHandle<'r> {
     }
   }
 
-  pub fn read(&self, dst: &mut [u8]) -> uint {
+  pub fn read(&self, dst: &mut [u8]) -> usize {
     let offset = self.seek.get();
     let inode_rc = self.file.get_inode_rc();
     let changed = inode_rc.borrow().read(offset, dst);
@@ -93,7 +93,7 @@ impl<'r> FileHandle<'r> {
     changed
   }
 
-  pub fn write(&mut self, src: &[u8]) -> uint {
+  pub fn write(&mut self, src: &[u8]) -> usize {
     let offset = self.seek.get();
     let inode_rc = self.file.get_inode_rc();
     let changed = inode_rc.borrow_mut().write(offset, src);
@@ -101,14 +101,14 @@ impl<'r> FileHandle<'r> {
     changed
   }
 
-  pub fn seek(&mut self, offset: int, whence: Whence) -> uint {
+  pub fn seek(&mut self, offset: isize, whence: Whence) -> usize {
     let inode_rc = self.file.get_inode_rc();
 
     let seek = self.seek.get();
     let new_seek = match whence {
-      SeekSet => offset as uint,
-      SeekCur => (seek as int + offset) as uint,
-      SeekEnd => (inode_rc.borrow().size() as int + offset) as uint
+      Whence::SeekSet => offset as usize,
+      Whence::SeekCur => (seek as isize + offset) as usize,
+      Whence::SeekEnd => (inode_rc.borrow().size() as isize + offset) as usize
     };
 
     self.seek.set(new_seek);

@@ -1,0 +1,13 @@
+[package]
+name = "rustfs-bench"
+version = "0.1.0"
+authors = ["Sergio Benitez <sb@sergio.bz>"]
+
+[dependencies]
+bench = { path = "../libbench" }
+rustfs = { path = "../" }
+rand = "0.3"
+
+[[bin]]
+name = "rustfs-bench"
+path = "bench.rs"

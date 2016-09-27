@@ -1,0 +1,8 @@
+[package]
+name = "rustfs"
+version = "0.1.0"
+authors = ["Sergio Benitez <sb@sergio.bz>"]
+
+[dependencies]
+time = "0.1"
+rand = "0.3"

@@ -1,6 +1,4 @@
 #![feature(asm)]
-#![crate_type = "lib"]
-#![crate_id = "bench"]
 
 extern crate time;
 
@@ -31,10 +29,10 @@ impl Benchmarker {
     }
   }
 
-  pub fn run(&mut self, f: ||) -> BenchTimeNS {
+  pub fn run<F: FnMut()>(&mut self, mut f: F) -> BenchTimeNS {
     let k = self.iterations;
     self.ns_start = precise_time_ns();
-    for _ in range(0, k) {
+    for _ in 0..k {
       black_box(f());
     }
     self.ns_end = precise_time_ns();
@@ -45,12 +43,12 @@ impl Benchmarker {
     (self.ns_end - self.ns_start) / self.iterations
   }
 
-  pub fn bench_n(&mut self, n: u64, f: |&mut Benchmarker|) {
+  pub fn bench_n<F: FnMut(&mut Benchmarker)>(&mut self, n: u64, mut f: F) {
     self.iterations = n;
     f(self); // f will call b.run internally
   }
 
-  pub fn bench(&mut self, f: |&mut Benchmarker|, min_time: u64) -> BenchResults {
+  pub fn bench<F: FnMut(&mut Benchmarker)>(&mut self, mut f: F, min_time: u64) -> BenchResults {
     // min_time is in ms, convert to ns. start with 1 iteration
     let min_time = min_time * 1_000_000;
     let mut n: u64 = 1;
@@ -62,7 +60,7 @@ impl Benchmarker {
 
       // If we've done enough, we're done
       let elapsed = self.ns_end - self.ns_start;
-      if elapsed == 0 { fail!("Must call run in benchmark function."); }
+      if elapsed == 0 { panic!("Must call run in benchmark function."); }
       if elapsed >= min_time { break }
 
       // Otherwise, adjust the number of iterations and try again
@@ -80,7 +78,7 @@ impl Benchmarker {
 }
 
 // Benchmark `f` for at least `time` ms
-pub fn benchmark(name: &str, f: |&mut Benchmarker|, time: u64) -> BenchResults {
+pub fn benchmark<F: FnMut(&mut Benchmarker)>(name: &str, f: F, time: u64) -> BenchResults {
   let mut bench = Benchmarker::new();
   let results = bench.bench(f, time);
   bench.print_results(name, results);
