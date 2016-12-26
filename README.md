@@ -8,34 +8,40 @@ Usage
 
 Add RustFS to your dependencies:
 
-	[dependencies]
-    rustfs = { git = "https://github.com/SergioBenitez/RustFS" }
+```toml
+[dependencies]
+rustfs = { git = "https://github.com/SergioBenitez/RustFS" }
+```
 
 Then, import the crate into your project and bring types into the namespace:
 
-	extern crate rustfs;
+```rust
+extern crate rustfs;
 
-	use rustfs::{Proc, O_CREAT, O_RDWR};
+use rustfs::{Proc, O_CREAT, O_RDWR};
+```
 
 Finally, use `Proc::new()` to create a new `Proc`. Call `open` / `close` /
 `seek` / `read` / `write` on it:
 
-	let mut p = Proc::new();
+```rust
+let mut p = Proc::new();
 
-	# Let's write `data` to a new file named "file".
-	let data = ... some data ...;
-    let fd = p.open("file", O_CREAT | O_RDWR);
-    p.write(fd, &data);
-    p.close(fd);
+// Let's write `data` to a new file named "file".
+let data = b"... some data ...";
+  let fd = p.open("file", O_CREAT | O_RDWR);
+  p.write(fd, &data);
+  p.close(fd);
 
-    # Let's read back that data to a buffer named `buf` of the correct size.
-    let mut buf = vec![0; size];
-    let fd = p.open("file", O_RDWR);
-    p.read(fd, &mut buf);
-    p.close(fd);
+  // Let's read back that data to a buffer named `buf` of the correct size.
+  let mut buf = vec![0; size];
+  let fd = p.open("file", O_RDWR);
+  p.read(fd, &mut buf);
+  p.close(fd);
 
-    # All done. Unlink.
-	p.unlink("file");
+  // All done. Unlink.
+p.unlink("file");
+```
 
 For more examples on how to use RustFS, see the benchmarks in bench/bench.rs and
 tests in src/proc.rs.
@@ -55,11 +61,15 @@ assembly. Assembly can only be used in Rust nightly.
 
 To run the benchmarks, switch into the `bench` directory:
 
-    cd bench
+```sh
+cd bench
+```
 
 Run them with Cargo:
 
-    cargo run --release
+```sh
+cargo run --release
+```
 
 Directory Structure
 -------------------
