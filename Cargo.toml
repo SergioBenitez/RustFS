@@ -6,3 +6,4 @@ authors = ["Sergio Benitez <sb@sergio.bz>"]
 [dependencies]
 time = "0.1"
 rand = "0.3"
+bitflags = "1.0.4"

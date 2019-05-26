@@ -1,4 +1,6 @@
 extern crate time;
+#[macro_use]
+extern crate bitflags;
 
 mod directory;
 mod file;
@@ -15,12 +17,16 @@ pub use inode::Inode;
 
 pub type FileDescriptor = isize;
 
-pub const O_RDONLY: u32 =   (1 << 0);
-pub const O_WRONLY: u32 =   (1 << 1);
-pub const O_RDWR: u32 =     (1 << 2);
-pub const O_NONBLOCK: u32 = (1 << 3);
-pub const O_APPEND: u32 =   (1 << 4);
-pub const O_CREAT: u32 =    (1 << 5);
+bitflags!{
+    pub struct FileFlags: u32 {
+        const O_RDONLY =   0b00000001;
+        const O_WRONLY =   0b00000010;
+        const O_RDWR =     0b00000100;
+        const O_NONBLOCK = 0b00001000;
+        const O_APPEND =   0b00010000;
+        const O_CREAT =    0b00100000;
+    }
+}
 
 pub struct Proc<'r> {
   cwd: File<'r>,
@@ -45,12 +51,12 @@ impl<'r> Proc<'r> {
     }
   }
 
-  pub fn open(&mut self, path: &'r str, flags: u32) -> FileDescriptor {
+  pub fn open(&mut self, path: &'r str, flags: FileFlags) -> FileDescriptor {
     let lookup = self.cwd.get(path);
     let file = match lookup {
       Some(f) => f,
       None => {
-        if (flags & O_CREAT) != 0 {
+        if (flags & FileFlags::O_CREAT) == FileFlags::O_CREAT {
           // FIXME: Fetch from allocator
           let rcinode = Rc::new(RefCell::new(Box::new(Inode::new())));
           let file = File::new_data_file(rcinode);
@@ -104,7 +110,7 @@ mod proc_tests {
   // extern crate test;
   extern crate rand;
 
-  use super::{Proc, O_RDWR, O_CREAT};
+  use super::{Proc, FileFlags};
   use file::Whence::SeekSet;
   use inode::Inode;
   use self::rand::random;
@@ -144,14 +150,14 @@ mod proc_tests {
     let mut buf = [0u8; SIZE];
     let filename = "first_file";
 
-    let fd = p.open(filename, O_RDWR | O_CREAT);
+    let fd = p.open(filename, FileFlags::O_RDWR | FileFlags::O_CREAT);
     p.write(fd, &data);
     p.seek(fd, 0, SeekSet);
     p.read(fd, &mut buf);
 
     assert_eq_buf(&data, &buf);
 
-    let fd2 = p.open(filename, O_RDWR);
+    let fd2 = p.open(filename, FileFlags::O_RDWR);
     let mut buf2 = [0u8; SIZE];
     p.read(fd2, &mut buf2);
 
@@ -160,7 +166,7 @@ mod proc_tests {
     p.close(fd);
     p.close(fd2);
 
-    let fd3 = p.open(filename, O_RDWR);
+    let fd3 = p.open(filename, FileFlags::O_RDWR);
     let mut buf3 = [0u8; SIZE];
     p.read(fd3, &mut buf3);
 
@@ -169,7 +175,7 @@ mod proc_tests {
 
     p.unlink(filename);
 
-    let fd4 = p.open(filename, O_RDWR);
+    let fd4 = p.open(filename, FileFlags::O_RDWR);
     assert_eq!(fd4, -2);
   }
 
@@ -184,7 +190,7 @@ mod proc_tests {
     let mut p = Proc::new();
     let mut data = rand_array(SIZE);
 
-    let fd = p.open("file", O_RDWR | O_CREAT);
+    let fd = p.open("file", FileFlags::O_RDWR | FileFlags::O_CREAT);
     p.write(fd, &mut data);
   }
 
@@ -210,7 +216,7 @@ mod proc_tests {
     let mut buf = [0u8; SIZE];
     let filename = "first_file";
 
-    let fd = p.open(filename, O_RDWR | O_CREAT);
+    let fd = p.open(filename, FileFlags::O_RDWR | FileFlags::O_CREAT);
     p.write(fd, &mut data);
     p.seek(fd, 0, SeekSet);
     p.read(fd, &mut buf);
@@ -239,7 +245,7 @@ mod proc_tests {
     let mut buf = [0u8; SIZE];
     let filename = "first_file";
 
-    let fd = p.open(filename, O_RDWR | O_CREAT);
+    let fd = p.open(filename, FileFlags::O_RDWR | FileFlags::O_CREAT);
     p.write(fd, &mut data);
     p.seek(fd, 0, SeekSet);
     p.read(fd, &mut buf);
@@ -249,7 +255,7 @@ mod proc_tests {
     p.close(fd);
     p.unlink(filename);
 
-    let fd4 = p.open(filename, O_RDWR);
+    let fd4 = p.open(filename, FileFlags::O_RDWR);
     assert_eq!(fd4, -2);
   }
 
@@ -262,7 +268,7 @@ mod proc_tests {
     let mut buf = vec![0; SIZE];
     let filename = "first_file";
 
-    let fd = p.open(filename, O_RDWR | O_CREAT);
+    let fd = p.open(filename, FileFlags::O_RDWR | FileFlags::O_CREAT);
     p.write(fd, &mut data1);
     p.seek(fd, 4096 * 257 * 256 - SIZE as isize, SeekSet);
     p.write(fd, &mut data2);
@@ -284,7 +290,7 @@ mod proc_tests {
     let mut data = rand_array(SIZE);
     let filename = "first_file";
 
-    let fd = p.open(filename, O_RDWR | O_CREAT);
+    let fd = p.open(filename, FileFlags::O_RDWR | FileFlags::O_CREAT);
     p.write(fd, &mut data);
     p.seek(fd, 4096 * 257 * 256 + 1 - SIZE as isize, SeekSet);
     p.write(fd, &mut data);
